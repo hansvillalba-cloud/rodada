@@ -57,7 +57,7 @@ const onFix=c=>{if(c.accuracy>30)return;
   if(sp>=30&&f.a!=null&&l.a!=null)S.grade+=.3*(Math.max(-25,Math.min(25,(l.a-f.a)/sp*100))-S.grade)}
  S.spd=S.sspd!=null?S.sspd:(gs||0);
  if(S.rec&&!S.pause)S.pts.push([Date.now(),+c.latitude.toFixed(6),+c.longitude.toFixed(6),S.alt==null?null:+S.alt.toFixed(1),S.hr||null,Math.round(S.cad)||null,S.pow||null,+S.spd.toFixed(1)]);
- climbpro();ui()};
+ mapUpd(c);climbpro();ui()};
 if(NAT)NAT.BackgroundGeolocation.addWatcher({backgroundTitle:'Rodada',backgroundMessage:'Registrando tu rodada',requestPermissions:true,stale:false,distanceFilter:0},(l,e)=>{if(e)return toast('GPS: '+(e.message||e.code));l&&onFix(l)});
 else navigator.geolocation.watchPosition(p=>onFix(p.coords),e=>toast('GPS: '+e.message),{enableHighAccuracy:true,maximumAge:0});
 
@@ -75,11 +75,74 @@ $('#end').onclick=async()=>{if(!S.rec)return;
  if(S.pts.length>10){const a={id:Date.now(),t0:S.t0,dist:S.dist,el:S.el,mov:S.mov,gain:S.gain,pts:S.pts};await tx('readwrite',s=>s.put(a));toast('Actividad guardada')}
  Object.assign(S,{rec:0,pause:0,pts:[],dist:0,gain:0,mov:0,el:0});try{wl&&wl.release()}catch{}ui();list()};
 
+/* ---------- Navegación en tiempo real ---------- */
+S.cues=[];S.dest=null;
+let map,mk,line,trk,follow=true,voice=true,said={},offT=0;
+function initMap(){if(map||!window.L)return;
+ map=L.map('map',{zoomControl:false}).setView([S.lat||4.65,S.lon||-74.08],15);
+ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+ line=L.polyline([],{color:'#ffd23f',weight:6,opacity:.9}).addTo(map);trk=L.polyline([],{color:'#5aa9ff',weight:4}).addTo(map);
+ mk=L.circleMarker([S.lat||0,S.lon||0],{radius:9,color:'#fff',weight:3,fillColor:'#d9363e',fillOpacity:1}).addTo(map);
+ map.on('dragstart',()=>{follow=false;$('#fl').classList.remove('on')});
+ map.on('contextmenu',e=>{if(confirm('¿Ir a este punto?'))navTo({lat:e.latlng.lat,lon:e.latlng.lng,name:'Punto en el mapa'})});
+ if(S.route)drawRoute(S.route)}
+function drawRoute(r){if(map)line.setLatLngs(r?r.map(p=>[p.lat,p.lon]):[])}
+function mapUpd(c){if(!map)return;const ll=[c.latitude,c.longitude];mk.setLatLng(ll);if(S.rec&&!S.pause)trk.addLatLng(ll);if(follow)map.setView(ll,Math.max(map.getZoom(),16),{animate:false})}
+const say=t=>{if(!voice||!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='es-CO';speechSynthesis.speak(u)};
+function smooth(o){return o.map((p,i)=>{const w=o.slice(Math.max(0,i-2),i+3);return{...p,a:w.reduce((s,x)=>s+x.a,0)/w.length}})}
+const brg=(a,b)=>{const dl=(b.lon-a.lon)*rad;return Math.atan2(Math.sin(dl)*Math.cos(b.lat*rad),Math.cos(a.lat*rad)*Math.sin(b.lat*rad)-Math.sin(a.lat*rad)*Math.cos(b.lat*rad)*Math.cos(dl))/rad};
+function cuesFromGeo(r){const o=[];let last=-999; // giros estimados a partir de la geometría del GPX
+ for(let i=2;i<r.length-2;i++){const d=(brg(r[i],r[i+2])-brg(r[i-2],r[i])+540)%360-180;
+  if(Math.abs(d)>=45&&r[i].d-last>150){last=r[i].d;const rt=d>0,sh=Math.abs(d)>110;o.push({d:r[i].d,lat:r[i].lat,lon:r[i].lon,ic:sh?'↩':rt?'↱':'↰',text:`Gira ${sh?'cerrado ':''}a la ${rt?'derecha':'izquierda'}`})}}
+ const e=r.at(-1);o.push({d:e.d,lat:e.lat,lon:e.lon,ic:'⚑',text:'Llegaste al final de la ruta'});return o}
+const MOD={left:'a la izquierda','slight left':'ligeramente a la izquierda','sharp left':'cerrado a la izquierda',right:'a la derecha','slight right':'ligeramente a la derecha','sharp right':'cerrado a la derecha',straight:'recto',uturn:'en U'};
+const ICO={left:'↰','slight left':'↖','sharp left':'↰',right:'↱','slight right':'↗','sharp right':'↱',straight:'↑',uturn:'↩'};
+function instr(s){const m=s.maneuver,t=m.type,md=MOD[m.modifier]||'',n=s.name?` por ${s.name}`:'';
+ if(t=='arrive')return 'Llegaste a tu destino';
+ if(t=='roundabout'||t=='rotary')return `En la glorieta toma la salida ${m.exit||''}`.trim();
+ if(['turn','end of road','fork','on ramp','off ramp'].includes(t))return `Gira ${md}${n}`;
+ return `Continúa ${md||'recto'}${n}`}
+const near=(r,la,lo)=>{let b=1e9,bi=0;r.forEach((p,i)=>{const d=hav(la,lo,p.lat,p.lon);if(d<b){b=d;bi=i}});return bi};
+async function addElev(r){if(r.length>2400)return toast('Ruta muy larga: sin ClimbPro');
+ try{const ch=[];for(let i=0;i<r.length;i+=100)ch.push(r.slice(i,i+100));
+  await Promise.all(ch.map(async s=>{const j=await(await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${s.map(p=>p.lat.toFixed(5))}&longitude=${s.map(p=>p.lon.toFixed(5))}`)).json();j.elevation.forEach((e,k)=>s[k].a=e)}))}
+ catch{toast('Sin datos de elevación: ClimbPro no disponible en esta ruta')}}
+async function navTo(d){
+ if(!S.lat)return toast('Aún no hay señal GPS');
+ $('#nav').classList.remove('hide');set('nv-i','…');set('nv-t','Calculando ruta…');set('nv-d','');set('nv-r','');
+ try{const j=await(await fetch(`https://routing.openstreetmap.de/routed-bike/route/v1/driving/${S.lon},${S.lat};${d.lon},${d.lat}?overview=full&geometries=geojson&steps=true`)).json();
+  if(!j.routes||!j.routes.length)throw new Error('no hay ruta disponible');
+  const rt=j.routes[0];let r=resample(rt.geometry.coordinates.map(c=>({lon:c[0],lat:c[1],a:0})));
+  if(r.length<2)throw new Error('destino demasiado cerca');
+  await addElev(r);r=smooth(r);
+  const cues=rt.legs.flatMap(l=>l.steps).filter(s=>s.maneuver.type!=='depart').map(s=>{const[lo,la]=s.maneuver.location;return{d:r[near(r,la,lo)].d,lat:la,lon:lo,text:instr(s),ic:s.maneuver.type=='arrive'?'⚑':ICO[s.maneuver.modifier]||'↑'}}).sort((a,b)=>a.d-b.d);
+  S.dest=d;setRoute(r,cues);follow=true;$('#fl').classList.add('on');say('Ruta calculada')}
+ catch(e){toast('Navegación: '+e.message);$('#nav').classList.add('hide')}}
+function guide(cur){const tot=S.route.at(-1).d,left=tot-cur,n=S.cues.find(c=>c.d>cur-15);offT=0;
+ $('#nav').classList.remove('hide');
+ if(n){const dist=n.d-cur;set('nv-i',n.ic);set('nv-t',n.text);set('nv-d',dist>=1000?km(dist)+' km':Math.max(0,Math.round(dist/10)*10)+' m');
+  for(const th of[200,50]){const k=n.d+'|'+th;if(dist<=th&&!said[k]&&(th==200||dist>20)){said[k]=1;say(th==200?`En ${th} metros, ${n.text}`:n.text)}}}
+ else{set('nv-i','↑');set('nv-t','Sigue la ruta');set('nv-d','')}
+ set('nv-r',`${km(left)} km restantes · ${Math.round(left/1000/Math.max(S.spd,10)*60)} min`)}
+function offRoute(){set('nv-i','⚠');set('nv-t','Fuera de ruta');set('nv-d','');$('#nav').classList.remove('hide');
+ if(!S.dest)return;const n=Date.now();if(!offT)offT=n;
+ if(n-offT>15000&&n-(S.lastRe||0)>30000){S.lastRe=n;offT=0;say('Recalculando ruta');navTo(S.dest)}}
+function clearRoute(){S.route=null;S.cues=[];S.climbs=[];S.dest=null;S.ridx=-1;['route','cues','dest'].forEach(k=>localStorage.removeItem(k));
+ $('#nav').classList.add('hide');$('#cp').classList.add('hide');drawRoute(null)}
+$('#fl').onclick=()=>{follow=!follow;$('#fl').classList.toggle('on',follow)};
+$('#fit').onclick=()=>{if(line&&line.getLatLngs().length){follow=false;$('#fl').classList.remove('on');map.fitBounds(line.getBounds(),{padding:[20,20]})}};
+$('#vz').onclick=e=>{voice=!voice;e.target.textContent='Voz: '+(voice?'sí':'no')};
+$('#xn').onclick=clearRoute;
+$('#qb').onclick=async()=>{const q=$('#q').value.trim();if(!q)return;
+ try{const j=await(await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q='+encodeURIComponent(q))).json(),box=$('#qr');box.textContent=j.length?'':'Sin resultados';
+  j.forEach(x=>{const b=document.createElement('button');b.textContent=x.display_name.split(',').slice(0,3).join(',');b.onclick=()=>{box.textContent='';navTo({lat:+x.lat,lon:+x.lon,name:x.display_name})};box.append(b)})}
+ catch(e){toast('Búsqueda: '+e.message)}};
+
 /* ---------- Perfil de elevación y ClimbPro ---------- */
 function resample(P){P=P.filter(p=>p.a!=null);if(P.length<2)return[];let cum=0,nx=50;const out=[{d:0,a:P[0].a,lat:P[0].lat,lon:P[0].lon}];
  for(let i=1;i<P.length;i++){const q=P[i-1],dd=hav(q.lat,q.lon,P[i].lat,P[i].lon);
   while(dd>0&&cum+dd>=nx){const f=(nx-cum)/dd;out.push({d:nx,a:q.a+(P[i].a-q.a)*f,lat:q.lat+(P[i].lat-q.lat)*f,lon:q.lon+(P[i].lon-q.lon)*f});nx+=50}cum+=dd}
- return out.map((p,i,o)=>{const w=o.slice(Math.max(0,i-2),i+3);return{...p,a:w.reduce((s,x)=>s+x.a,0)/w.length}})}
+ return smooth(out)}
 function findClimbs(r){const g=[];for(let i=0;i<r.length-1;i++)g.push((r[i+1].a-r[i].a)/(r[i+1].d-r[i].d)*100);
  const out=[];let i=0;
  while(i<g.length){if(g[i]>=3){let e=i,dip=0;for(let j=i;j<g.length;j++){if(g[j]>=2){e=j;dip=0}else{dip+=50;if(dip>150)break}}
@@ -91,20 +154,20 @@ function prof(cv,r,mk){const w=cv.width=cv.clientWidth*2,h=cv.height=cv.clientHe
  for(let i=0;i<r.length-1;i++){g.fillStyle=gc((r[i+1].a-r[i].a)/50*100);g.beginPath();g.moveTo(X(r[i].d),h);g.lineTo(X(r[i].d),Y(r[i].a));g.lineTo(X(r[i+1].d)+1,Y(r[i+1].a));g.lineTo(X(r[i+1].d)+1,h);g.fill()}
  if(mk!=null){g.fillStyle='#fff';g.fillRect(X(mk)-2,0,4,h)}}
 const km=m=>(m/1000).toFixed(1);
-function setRoute(r){S.route=r;S.climbs=findClimbs(r);S.ridx=-1;$('#cp').classList.remove('hide');
+function setRoute(r,cues){S.cues=cues||cuesFromGeo(r);said={};try{localStorage.route=JSON.stringify(r.map(p=>[p.d,+p.a.toFixed(1),+p.lat.toFixed(6),+p.lon.toFixed(6)]));localStorage.cues=JSON.stringify(S.cues);localStorage.dest=JSON.stringify(S.dest)}catch{}drawRoute(r);S.route=r;S.climbs=findClimbs(r);S.ridx=-1;$('#cp').classList.remove('hide');
  $('#clist').innerHTML=S.climbs.length?S.climbs.map((c,i)=>`<span style="color:${gc(c.avg)}">${i+1}. km ${km(c.s)} · ${km(c.len)} km · ${c.avg.toFixed(1)}% · +${Math.round(c.gain)} m</span>`).join(''):'Esta ruta no tiene subidas de ClimbPro.';
  set('cpt',`${km(r.at(-1).d)} km · ${S.climbs.length} subidas`);prof($('#cpc'),r)}
 $('#gpxf').onchange=async e=>{const f=e.target.files[0];if(!f)return;
  const x=new DOMParser().parseFromString(await f.text(),'text/xml');
  const P=[...x.querySelectorAll('trkpt,rtept')].map(p=>({lat:+p.getAttribute('lat'),lon:+p.getAttribute('lon'),a:p.querySelector('ele')?+p.querySelector('ele').textContent:null}));
  const r=resample(P);if(r.length<2)return toast('El GPX necesita elevación (<ele>).');
- localStorage.route=JSON.stringify(r.map(p=>[p.d,+p.a.toFixed(1),+p.lat.toFixed(6),+p.lon.toFixed(6)]));setRoute(r)};
-if(localStorage.route)setRoute(JSON.parse(localStorage.route).map(p=>({d:p[0],a:p[1],lat:p[2],lon:p[3]})));
+ localStorage.route=JSON.stringify(r.map(p=>[p.d,+p.a.toFixed(1),+p.lat.toFixed(6),+p.lon.toFixed(6)]));S.dest=null;setRoute(r)};
+if(localStorage.route){try{S.dest=JSON.parse(localStorage.dest||'null')}catch{}setRoute(JSON.parse(localStorage.route).map(p=>({d:p[0],a:p[1],lat:p[2],lon:p[3]})),localStorage.cues?JSON.parse(localStorage.cues):null)}
 function climbpro(){const R=S.route;if(!R||!S.lat)return;
  const lo=S.ridx<0?0:Math.max(0,S.ridx-10),hi=S.ridx<0?R.length:Math.min(R.length,S.ridx+200);let b=1e9,bi=-1;
  for(let i=lo;i<hi;i++){const d=hav(S.lat,S.lon,R[i].lat,R[i].lon);if(d<b){b=d;bi=i}}
- if(b>60){S.ridx=-1;return set('cpt','Fuera de la ruta')}
- S.ridx=bi;const cur=R[bi].d,c=S.climbs.find(c=>cur>=c.s&&cur<c.e);
+ if(b>60){S.ridx=-1;offRoute();return set('cpt','Fuera de la ruta')}
+ S.ridx=bi;const cur=R[bi].d;guide(cur);const c=S.climbs.find(c=>cur>=c.s&&cur<c.e);
  if(c){const rem=c.e-cur,asc=R[c.ei].a-R[bi].a,i=S.climbs.indexOf(c)+1;
   set('cpt',`Subida ${i}/${S.climbs.length} · quedan ${km(rem)} km · +${Math.round(asc)} m · ${(asc/rem*100).toFixed(1)}% prom.`);prof($('#cpc'),R.slice(c.si,c.ei+1),cur)}
  else{const n=S.climbs.find(c=>c.s>cur);
@@ -125,5 +188,5 @@ function detail(a){const avg=i=>{const v=a.pts.map(p=>p[i]).filter(Boolean);retu
  $('#dl').onclick=async()=>{if(confirm('¿Borrar esta actividad?')){await tx('readwrite',s=>s.delete(a.id));$('#det').innerHTML='';list()}}}
 
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
- ['ride','acts-v'].forEach(id=>$('#'+id).classList.toggle('hide',id!==b.dataset.t));if(S.route&&b.dataset.t=='ride')setRoute(S.route)});
+ ['ride','map-v','acts-v'].forEach(id=>$('#'+id).classList.toggle('hide',id!==b.dataset.t));if(S.route&&b.dataset.t=='ride')setRoute(S.route,S.cues);if(b.dataset.t=='map-v'){initMap();map&&setTimeout(()=>map.invalidateSize(),60)}});
 list();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');

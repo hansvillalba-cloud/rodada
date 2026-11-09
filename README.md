@@ -6,6 +6,8 @@ App web (PWA) de ciclismo: GPS en tiempo real, sensores Bluetooth, pendiente, Cl
 - **Tiempo real:** velocidad, distancia, altitud, desnivel acumulado y pendiente (%) calculada sobre ~50 m.
 - **Sensores BLE (Web Bluetooth):** pulso cardíaco, velocidad/cadencia (CSC) y potencia. Reconexión automática.
 - **ClimbPro:** carga un GPX con elevación; detecta subidas (≥500 m, ≥3 % prom., ≥25 m de desnivel) y muestra distancia y desnivel restantes, pendiente promedio restante y perfil coloreado por pendiente.
+- **Navegación en tiempo real:** pestaña *Mapa* (Leaflet + OpenStreetMap). Busca un destino o mantén presionado el mapa; calcula ruta en bicicleta, muestra giros con flecha, distancia al próximo giro, km y minutos restantes, aviso por voz a 200 m y 50 m, y recalcula si te sales de la ruta más de 15 s. Las rutas calculadas también traen elevación, así que ClimbPro funciona en ellas.
+- **Rutas GPX:** los giros se estiman a partir de la geometría del trazado (sin nombres de calles).
 - **Actividades:** guardado local (IndexedDB), detalle con perfil, subidas detectadas, promedios y exportación a GPX.
 - **Offline:** instalable desde Chrome ("Añadir a pantalla de inicio").
 
@@ -31,3 +33,6 @@ Usa Capacitor: Bluetooth LE nativo (`@capacitor-community/bluetooth-le`) y GPS e
 **Local:** `npm ci && npm run build:native && npx cap add android && node scripts/patch-android.js && npx cap sync android && npx cap open android`.
 
 **iOS:** requiere Mac + Xcode: `npx cap add ios`, y añadir en Info.plist `NSBluetoothAlwaysUsageDescription`, `NSLocationWhenInUseUsageDescription`, `NSLocationAlwaysAndWhenInUseUsageDescription` y el modo de fondo *Location updates*.
+
+## Servicios externos de la navegación
+Búsqueda: Nominatim; rutas: routing.openstreetmap.de (perfil bicicleta); elevación: Open-Meteo; mapa: tiles de OpenStreetMap. Son servicios públicos gratuitos con límites de uso razonable: para uso intensivo conviene una clave propia (p. ej. OpenRouteService o MapTiler). Requiere internet; no hay mapas offline.

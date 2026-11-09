@@ -2,6 +2,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0e1a2b"><link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg">
 <title>Rodada</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 :root{--bg:#0e1a2b;--panel:#16263c;--line:#27405f;--tx:#eef3f8;--mut:#8ea3bb;--ac:#ffd23f;color-scheme:dark}
 *{box-sizing:border-box;margin:0}
@@ -21,8 +22,14 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;padding:8px 12px
 .row{display:flex;gap:12px;flex-wrap:wrap;color:var(--mut);font-size:14px}.mut{color:var(--mut)}
 #toast{position:fixed;top:calc(8px + env(safe-area-inset-top));left:12px;right:12px;background:#d9363e;border-radius:8px;padding:10px;display:none;z-index:9}
 input[type=number]{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px;width:110px;font:inherit}
+.nav{position:sticky;top:0;z-index:5;background:var(--ac);color:#10202f;border-radius:10px;padding:8px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;margin-bottom:10px}
+.nav .i{font-size:36px;line-height:1}.nav b{font-size:20px}
+#map{height:52vh;border-radius:10px;z-index:0}
+input[type=search]{flex:2;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;min-width:0}
+#qr{display:grid;gap:6px}
 </style></head><body>
 <div id="toast"></div>
+<div id="nav" class="nav hide"><span class="i" id="nv-i">↑</span><div><b id="nv-t"></b><div id="nv-r" style="font-size:13px"></div></div><b id="nv-d"></b></div>
 <section id="ride">
  <div><div class="big" id="spd">0.0</div><div class="mut" style="text-align:center">km/h</div></div>
  <div class="grid">
@@ -37,6 +44,12 @@ input[type=number]{background:var(--bg);color:var(--tx);border:1px solid var(--l
  <div class="bar"><label class="btn">Cargar ruta GPX<input type="file" id="gpxf" accept=".gpx" hidden></label>
  <label class="btn">Rueda (mm) <input type="number" id="wh" value="2105"></label></div>
 </section>
+<section id="map-v" class="hide">
+ <div class="bar"><input id="q" type="search" placeholder="Buscar destino…"><button id="qb">Buscar</button></div>
+ <div id="qr"></div><div id="map"></div>
+ <div class="bar"><button id="fl" class="on">Seguir</button><button id="fit">Ver ruta</button><button id="vz">Voz: sí</button><button id="xn">Cancelar</button></div>
+ <p class="mut">Mantén presionado el mapa para elegir un destino. La ruta se calcula para bicicleta.</p>
+</section>
 <section id="acts-v" class="hide"><h2>Actividades</h2><div id="acts"></div><div id="det"></div></section>
-<nav><button data-t="ride" class="on">Rodar</button><button data-t="acts-v">Actividades</button></nav>
-<script src="native.js"></script><script src="app.js"></script></body></html>
+<nav><button data-t="ride" class="on">Rodar</button><button data-t="map-v">Mapa</button><button data-t="acts-v">Actividades</button></nav>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script><script src="native.js"></script><script src="app.js"></script></body></html>
