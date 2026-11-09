@@ -1,64 +1,66 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0e1a2b"><link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg">
-<title>Rodada</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<title>Rodada</title>
 <style>
 :root{--bg:#0e1a2b;--panel:#16263c;--line:#27405f;--tx:#eef3f8;--mut:#8ea3bb;--ac:#ffd23f;color-scheme:dark}
 *{box-sizing:border-box;margin:0}
 body{background:var(--bg);color:var(--tx);font:16px/1.4 "Bahnschrift","DIN Alternate","Segoe UI",system-ui,sans-serif;max-width:640px;margin:auto;padding:calc(12px + env(safe-area-inset-top)) 12px calc(76px + env(safe-area-inset-bottom))}
-section{display:grid;gap:10px}.hide{display:none}
-.big{font-size:min(30vw,150px);font-weight:700;line-height:1;font-variant-numeric:tabular-nums;color:var(--ac);text-align:center}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.m{background:var(--panel);border-radius:10px;padding:8px 4px;text-align:center}
-.m b{display:block;font-size:22px;font-variant-numeric:tabular-nums}.m span{font-size:12px;color:var(--mut)}
-.bar{display:flex;gap:8px}.bar>*{flex:1}
-button,.btn{background:var(--panel);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;min-height:48px;text-align:center;cursor:pointer}
+.hide{display:none}.mut{color:var(--mut)}
+button,.btn{background:var(--panel);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;min-height:48px;text-align:center;cursor:pointer}
 button.on{border-color:#2f9e5b;color:#7ee2a0}button.pri{background:var(--ac);color:#10202f;border:0;font-weight:700}
-button:focus-visible,.btn:focus-within{outline:2px solid #fff;outline-offset:2px}
-canvas{width:100%;height:90px;display:block;border-radius:8px;background:#0b1523}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:#0b1523;border-top:1px solid var(--line)}nav button{flex:1}
-.card{background:var(--panel);border-radius:10px;padding:12px;display:grid;gap:6px}
-.row{display:flex;gap:12px;flex-wrap:wrap;color:var(--mut);font-size:14px}.mut{color:var(--mut)}
-#toast{position:fixed;top:calc(8px + env(safe-area-inset-top));left:12px;right:12px;background:#d9363e;border-radius:8px;padding:10px;display:none;z-index:9}
-input[type=number]{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px;width:110px;font:inherit}
-.nav{position:sticky;top:0;z-index:5;background:var(--ac);color:#10202f;border-radius:10px;padding:8px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;margin-bottom:10px}
-.nav .i{font-size:36px;line-height:1}.nav b{font-size:20px}
-#map-v{position:fixed;inset:0;z-index:3;background:var(--bg);display:block}#map-v.hide{display:none}
-#mapbox{position:absolute;inset:0;overflow:hidden}#mapwrap{position:absolute;transform-origin:50% 50%}#map{width:100%;height:100%;z-index:0}
+button:focus-visible,.btn:focus-within,select:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.bar{display:flex;gap:8px;flex-wrap:wrap}.bar>*{flex:1}
+input[type=number],input[type=search],select{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;min-width:0;min-height:48px}
+.card{background:var(--panel);border-radius:10px;padding:12px;display:grid;gap:6px;margin:8px 0}
+.row{display:flex;gap:12px;flex-wrap:wrap;color:var(--mut);font-size:14px}
+canvas{display:block;border-radius:8px;background:#0b1523}
+#toast{position:fixed;top:calc(8px + env(safe-area-inset-top));left:12px;right:12px;background:#d9363e;border-radius:8px;padding:10px;display:none;z-index:40}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:#0b1523;border-top:1px solid var(--line);z-index:10}nav button{flex:1}
+/* pantalla principal tipo ciclocomputador */
+#ride{position:fixed;inset:0 0 calc(64px + env(safe-area-inset-bottom)) 0;display:flex;flex-direction:column;gap:4px;padding:env(safe-area-inset-top) 4px 4px;z-index:1;background:var(--bg)}#ride.hide{display:none}
+.nav{background:var(--ac);color:#10202f;border-radius:10px;padding:6px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.nav .i{font-size:44px;line-height:1}.nav b{font-size:20px}.nav #nv-d{font-size:26px}
+#screen{flex:1;min-height:0;display:flex;flex-direction:column;gap:4px}
+.prow{display:flex;gap:4px;min-height:0}
+.cell{flex:1;min-width:0;background:var(--panel);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;container-type:size;overflow:hidden}
+.cell b{font-size:28px;font-size:min(44cqh,calc(88cqw / var(--n,4)));line-height:1;font-weight:700;font-variant-numeric:tabular-nums}
+.cell span{font-size:12px;color:var(--mut);margin-top:2px}
+.cell.big{display:block;position:relative;padding:0}
+#dots{text-align:center;color:var(--mut);font-size:12px;letter-spacing:4px;line-height:1}
+#ctl{display:flex;gap:6px}#ctl button{flex:1;padding:6px}#ctl #go{flex:2.2}
+#mapbox{position:absolute;inset:0;overflow:hidden}#mapwrap{position:absolute;transform-origin:50% 50%}#map{width:100%;height:100%}
 #arrow{position:absolute;left:50%;width:0;height:0;margin:-18px 0 0 -14px;border-left:14px solid transparent;border-right:14px solid transparent;border-bottom:36px solid #d9363e;filter:drop-shadow(0 0 3px #fff);display:none;z-index:2;pointer-events:none}
-.fabs{position:absolute;right:10px;top:calc(96px + env(safe-area-inset-top));display:grid;gap:8px;z-index:4}.fabs button{width:48px;padding:0;font-size:20px;background:#0b1523e6}
-#sp{position:absolute;left:12px;right:70px;top:calc(88px + env(safe-area-inset-top));z-index:4;background:#0b1523f2;border-radius:10px;padding:8px}#sp .bar{margin-bottom:6px}
-.chip{position:absolute;left:12px;top:calc(88px + env(safe-area-inset-top));width:min(55vw,260px);z-index:4;background:#0b1523e6;border-radius:10px;padding:6px;font-size:13px}.chip canvas{height:56px;margin-top:4px}
-.hud{position:absolute;left:0;right:0;bottom:calc(72px + env(safe-area-inset-bottom));z-index:4;background:#0b1523f2;display:grid;grid-template-columns:1.5fr repeat(4,1fr);gap:4px;padding:6px 8px;align-items:center;text-align:center}
-.hud b{display:block;font-size:20px;font-variant-numeric:tabular-nums}.hud .hs b{font-size:40px;color:var(--ac)}.hud span{font-size:11px;color:var(--mut)}.hud button{grid-column:1/-1;min-height:44px}
-body.bc #nav{position:fixed;top:calc(8px + env(safe-area-inset-top));left:12px;right:12px;margin:0}body.bc #nav .i{font-size:48px}body.bc #nav #nv-t{font-size:22px}body.bc #nav #nv-d{font-size:26px}
-input[type=search]{flex:2;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;min-width:0}
-#qr{display:grid;gap:6px}
+.mbtn{position:absolute;right:6px;top:6px;display:grid;gap:6px;z-index:4}.mbtn button{width:44px;min-height:44px;padding:0;font-size:20px;background:#0b1523e6}
+#climbbox{position:absolute;inset:0;padding:8px;display:flex;flex-direction:column;gap:6px}#cpt{font-size:15px}.cvw{flex:1;min-height:0;position:relative}.cvw canvas{position:absolute;inset:0;width:100%;height:100%}
+/* menú y editor */
+.ov{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;padding:calc(12px + env(safe-area-inset-top)) 12px 24px;max-width:640px;margin:auto}.ov.hide{display:none}
+.ov>*{margin-bottom:10px}.ov h3{color:var(--ac);font-size:15px;margin-top:14px}#qr{display:grid;gap:6px}
+.erow{display:flex;gap:6px;flex-wrap:wrap}.erow select{flex:1 1 90px}.erow button{min-height:48px;width:48px;padding:0}
 </style></head><body>
 <div id="toast"></div>
-<div id="nav" class="nav hide"><span class="i" id="nv-i">↑</span><div><b id="nv-t"></b><div id="nv-r" style="font-size:13px"></div></div><b id="nv-d"></b></div>
 <section id="ride">
- <div><div class="big" id="spd">0.0</div><div class="mut" style="text-align:center">km/h</div></div>
- <div class="grid">
-  <div class="m"><b id="time">0:00:00</b><span>Tiempo</span></div><div class="m"><b id="dist">0.00</b><span>km</span></div>
-  <div class="m"><b id="gr">0.0%</b><span>Pendiente</span></div><div class="m"><b id="alt">–</b><span>Altitud m</span></div>
-  <div class="m"><b id="gain">0</b><span>Desnivel + m</span></div><div class="m"><b id="hr">–</b><span>Pulso</span></div>
-  <div class="m"><b id="cad">–</b><span>Cadencia</span></div><div class="m"><b id="pow">–</b><span>Vatios</span></div>
- </div>
- <div class="bar"><button id="go" class="pri">Iniciar</button><button id="end">Terminar</button></div>
- <div class="bar"><button data-bt="hr">Pulso</button><button data-bt="csc">Vel./Cad.</button><button data-bt="pow">Potencia</button></div>
- <div class="card hide" id="cp"><b>ClimbPro</b><div id="cpt" class="mut"></div><canvas id="cpc"></canvas><div id="clist" class="row"></div></div>
- <div class="bar"><label class="btn">Cargar ruta GPX<input type="file" id="gpxf" accept=".gpx" hidden></label>
- <label class="btn">Rueda (mm) <input type="number" id="wh" value="2105"></label></div>
+ <div id="nav" class="nav hide"><span class="i" id="nv-i">↑</span><div><b id="nv-t"></b><div id="nv-r" style="font-size:13px"></div></div><b id="nv-d"></b></div>
+ <div id="screen"></div>
+ <div id="dots"></div>
+ <div id="ctl"><button id="pv" aria-label="Pantalla anterior">‹</button><button id="go" class="pri">Iniciar</button><button id="end">Terminar</button><button id="nx" aria-label="Pantalla siguiente">›</button><button id="mn" aria-label="Menú">☰</button></div>
 </section>
-<section id="map-v" class="hide">
- <div id="mapbox"><div id="mapwrap"><div id="map"></div></div><div id="arrow"></div></div>
- <div class="fabs"><button id="sb" aria-label="Buscar destino">🔍</button><button id="fl" class="on" aria-label="Seguir">◎</button><button id="fit" aria-label="Ver ruta">⤢</button><button id="vz" aria-label="Voz">🔊</button><button id="xn" aria-label="Cancelar navegación">✕</button></div>
- <div id="sp" class="hide"><div class="bar"><input id="q" type="search" placeholder="Buscar destino…"><button id="qb">Buscar</button></div><div id="qr"></div></div>
- <div id="cpw" class="chip hide"><div id="cpm"></div><canvas id="cpc2"></canvas></div>
- <div class="hud"><div class="hs"><b id="h-spd">0.0</b><span>km/h</span></div><div><b id="h-time">0:00:00</b><span>Tiempo</span></div><div><b id="h-dist">0.00</b><span>km</span></div><div><b id="h-gr">0.0%</b><span>Pend.</span></div><div><b id="h-hr">–</b><span>Pulso</span></div><button id="go2" class="pri">Iniciar</button></div>
-</section>
+<div id="holder" hidden>
+ <div id="mapbox"><div id="mapwrap"><div id="map"></div></div><div id="arrow"></div>
+  <div class="mbtn"><button id="zi" aria-label="Acercar">+</button><button id="zo" aria-label="Alejar">−</button><button id="fl" class="on" aria-label="Seguir">◎</button></div></div>
+ <div id="climbbox"><div id="cpt">Carga o calcula una ruta para ver ClimbPro</div><div class="cvw"><canvas id="cpc"></canvas></div></div>
+</div>
 <section id="acts-v" class="hide"><h2>Actividades</h2><div id="acts"></div><div id="det"></div></section>
-<nav><button data-t="ride" class="on">Rodar</button><button data-t="map-v">Mapa</button><button data-t="acts-v">Actividades</button></nav>
+<div id="menu" class="ov hide"><h2>Menú</h2>
+ <h3>Sensores Bluetooth</h3><div class="bar"><button data-bt="hr">Pulso</button><button data-bt="csc">Vel./Cad.</button><button data-bt="pow">Potencia</button></div>
+ <h3>Navegación</h3><div class="bar"><input id="q" type="search" placeholder="Buscar destino…"><button id="qb">Buscar</button></div><div id="qr"></div>
+ <p class="mut">También puedes mantener presionado el mapa para elegir un destino.</p>
+ <div class="bar"><label class="btn">Cargar ruta GPX<input type="file" id="gpxf" accept=".gpx" hidden></label><button id="xn">Cancelar ruta</button><button id="vz">Voz: sí</button></div>
+ <div id="clist" class="row"></div>
+ <h3>Pantallas</h3><button id="edb">Personalizar pantallas</button>
+ <h3>Rueda</h3><label>Circunferencia (mm) <input type="number" id="wh" value="2105"></label>
+ <button id="mx" class="pri">Cerrar</button></div>
+<div id="ed" class="ov hide"><h2>Personalizar pantallas</h2><div id="edc"></div><button id="edok" class="pri">Listo</button></div>
+<nav><button data-t="ride" class="on">Rodar</button><button data-t="acts-v">Actividades</button></nav>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script><script src="native.js"></script><script src="app.js"></script></body></html>
