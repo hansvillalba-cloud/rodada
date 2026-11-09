@@ -24,7 +24,15 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;padding:8px 12px
 input[type=number]{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px;width:110px;font:inherit}
 .nav{position:sticky;top:0;z-index:5;background:var(--ac);color:#10202f;border-radius:10px;padding:8px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;margin-bottom:10px}
 .nav .i{font-size:36px;line-height:1}.nav b{font-size:20px}
-#map{height:52vh;border-radius:10px;z-index:0}
+#map-v{position:fixed;inset:0;z-index:3;background:var(--bg);display:block}#map-v.hide{display:none}
+#mapbox{position:absolute;inset:0;overflow:hidden}#mapwrap{position:absolute;transform-origin:50% 50%}#map{width:100%;height:100%;z-index:0}
+#arrow{position:absolute;left:50%;width:0;height:0;margin:-18px 0 0 -14px;border-left:14px solid transparent;border-right:14px solid transparent;border-bottom:36px solid #d9363e;filter:drop-shadow(0 0 3px #fff);display:none;z-index:2;pointer-events:none}
+.fabs{position:absolute;right:10px;top:calc(96px + env(safe-area-inset-top));display:grid;gap:8px;z-index:4}.fabs button{width:48px;padding:0;font-size:20px;background:#0b1523e6}
+#sp{position:absolute;left:12px;right:70px;top:calc(88px + env(safe-area-inset-top));z-index:4;background:#0b1523f2;border-radius:10px;padding:8px}#sp .bar{margin-bottom:6px}
+.chip{position:absolute;left:12px;top:calc(88px + env(safe-area-inset-top));width:min(55vw,260px);z-index:4;background:#0b1523e6;border-radius:10px;padding:6px;font-size:13px}.chip canvas{height:56px;margin-top:4px}
+.hud{position:absolute;left:0;right:0;bottom:calc(72px + env(safe-area-inset-bottom));z-index:4;background:#0b1523f2;display:grid;grid-template-columns:1.5fr repeat(4,1fr);gap:4px;padding:6px 8px;align-items:center;text-align:center}
+.hud b{display:block;font-size:20px;font-variant-numeric:tabular-nums}.hud .hs b{font-size:40px;color:var(--ac)}.hud span{font-size:11px;color:var(--mut)}.hud button{grid-column:1/-1;min-height:44px}
+body.bc #nav{position:fixed;top:calc(8px + env(safe-area-inset-top));left:12px;right:12px;margin:0}body.bc #nav .i{font-size:48px}body.bc #nav #nv-t{font-size:22px}body.bc #nav #nv-d{font-size:26px}
 input[type=search]{flex:2;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;min-width:0}
 #qr{display:grid;gap:6px}
 </style></head><body>
@@ -45,10 +53,11 @@ input[type=search]{flex:2;background:var(--bg);color:var(--tx);border:1px solid 
  <label class="btn">Rueda (mm) <input type="number" id="wh" value="2105"></label></div>
 </section>
 <section id="map-v" class="hide">
- <div class="bar"><input id="q" type="search" placeholder="Buscar destino…"><button id="qb">Buscar</button></div>
- <div id="qr"></div><div id="map"></div>
- <div class="bar"><button id="fl" class="on">Seguir</button><button id="fit">Ver ruta</button><button id="vz">Voz: sí</button><button id="xn">Cancelar</button></div>
- <p class="mut">Mantén presionado el mapa para elegir un destino. La ruta se calcula para bicicleta.</p>
+ <div id="mapbox"><div id="mapwrap"><div id="map"></div></div><div id="arrow"></div></div>
+ <div class="fabs"><button id="sb" aria-label="Buscar destino">🔍</button><button id="fl" class="on" aria-label="Seguir">◎</button><button id="fit" aria-label="Ver ruta">⤢</button><button id="vz" aria-label="Voz">🔊</button><button id="xn" aria-label="Cancelar navegación">✕</button></div>
+ <div id="sp" class="hide"><div class="bar"><input id="q" type="search" placeholder="Buscar destino…"><button id="qb">Buscar</button></div><div id="qr"></div></div>
+ <div id="cpw" class="chip hide"><div id="cpm"></div><canvas id="cpc2"></canvas></div>
+ <div class="hud"><div class="hs"><b id="h-spd">0.0</b><span>km/h</span></div><div><b id="h-time">0:00:00</b><span>Tiempo</span></div><div><b id="h-dist">0.00</b><span>km</span></div><div><b id="h-gr">0.0%</b><span>Pend.</span></div><div><b id="h-hr">–</b><span>Pulso</span></div><button id="go2" class="pri">Iniciar</button></div>
 </section>
 <section id="acts-v" class="hide"><h2>Actividades</h2><div id="acts"></div><div id="det"></div></section>
 <nav><button data-t="ride" class="on">Rodar</button><button data-t="map-v">Mapa</button><button data-t="acts-v">Actividades</button></nav>
