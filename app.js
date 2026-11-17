@@ -5,14 +5,15 @@ const km=m=>(m/1000).toFixed(1);
 const rad=Math.PI/180,hav=(a,b,c,d)=>{const p=(c-a)*rad,q=(d-b)*rad,x=Math.sin(p/2)**2+Math.cos(a*rad)*Math.cos(c*rad)*Math.sin(q/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
 const gc=g=>g<3?'#2f9e5b':g<6?'#e6c229':g<9?'#f08a24':g<12?'#d9363e':'#8a1130'; // colores ClimbPro
 const S={rec:0,pause:0,pts:[],dist:0,odo:0,gain:0,mov:0,el:0,max:0,hr:0,cad:0,pow:0,sspd:null,sat:0,cat:0,spd:0,grade:0,alt:null,buf:[],last:null,lat:0,lon:0,ridx:-1,route:null,climbs:[],cues:[],dest:null,hdg:0,left:null};
+Object.assign(S,{uid:'u1',sport:'ride',bike:'road',pms:0,pst:0,lf:0,ac:{on:0,cs:null,dip:0,pr:[],list:[],lo:null}});
 let wheel=(+localStorage.wheel||2105)/1000,map,mk,line,trk,follow=true,voice=true,said={},offT=0,pages,pg=0,ep=0;
 $('#wh').value=wheel*1000;$('#wh').onchange=e=>{wheel=e.target.value/1000;localStorage.wheel=e.target.value};
 const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',4000)};
 const btn=(t,f)=>{const b=document.createElement('button');b.textContent=t;b.onclick=f;return b};
 
 /* ---------- Almacenamiento (IndexedDB) ---------- */
-const db=new Promise((ok,ko)=>{const r=indexedDB.open('rodada',1);r.onupgradeneeded=()=>r.result.createObjectStore('act',{keyPath:'id'});r.onsuccess=()=>ok(r.result);r.onerror=ko});
-const tx=async(m,f)=>{const d=await db;return new Promise((ok,ko)=>{const t=d.transaction('act',m);const r=f(t.objectStore('act'));t.oncomplete=()=>ok(r.result);t.onerror=ko})};
+const db=new Promise((ok,ko)=>{const r=indexedDB.open('rodada',2);r.onupgradeneeded=()=>['act','sess'].forEach(n=>{if(!r.result.objectStoreNames.contains(n))r.result.createObjectStore(n,{keyPath:'id'})});r.onsuccess=()=>ok(r.result);r.onerror=ko});
+const tx=async(m,f,st='act')=>{const d=await db;return new Promise((ok,ko)=>{const t=d.transaction(st,m);const r=f(t.objectStore(st));t.oncomplete=()=>ok(r.result);t.onerror=ko})};
 
 /* ---------- Sensores Bluetooth ---------- */
 function cscH(){const q={};return v=>{const f=v.getUint8(0),n=Date.now();let o=1;
@@ -56,30 +57,37 @@ const onFix=c=>{if(c.accuracy>30)return;
   const f=S.buf[0],l=S.buf.at(-1),sp=l.d-f.d;
   if(sp>=30&&f.a!=null&&l.a!=null)S.grade+=.3*(Math.max(-25,Math.min(25,(l.a-f.a)/sp*100))-S.grade)}
  S.spd=S.sspd!=null?S.sspd:(gs||0);
+ const nw=Date.now(),dtf=S.lf?Math.min((nw-S.lf)/1000,10):0;S.lf=nw;if(S.rec&&!S.pause&&S.spd>1.5)S.mov+=dtf;
  if(S.rec&&!S.pause){if(S.spd<90)S.max=Math.max(S.max,S.spd);S.pts.push([Date.now(),+c.latitude.toFixed(6),+c.longitude.toFixed(6),S.alt==null?null:+S.alt.toFixed(1),S.hr||null,Math.round(S.cad)||null,S.pow||null,+S.spd.toFixed(1)])}
- mapUpd(c);climbpro();ui()};
+ liveClimb();mapUpd(c);climbpro();ui()};
 if(NAT)NAT.BackgroundGeolocation.addWatcher({backgroundTitle:'Rodada',backgroundMessage:'Registrando tu rodada',requestPermissions:true,stale:false,distanceFilter:0},(l,e)=>{if(e)return toast('GPS: '+(e.message||e.code));l&&onFix(l)});
 else navigator.geolocation.watchPosition(p=>onFix(p.coords),e=>toast('GPS: '+e.message),{enableHighAccuracy:true,maximumAge:0});
-setInterval(()=>{const n=Date.now(),dt=(n-(S.tk||n))/1000;S.tk=n;
- if(n-S.cat>3000)S.cad=0;if(n-S.sat>3000)S.sspd=null;
- if(S.rec&&!S.pause){S.el+=dt;if(S.spd>1.5)S.mov+=dt}ui()},1000);
+setInterval(()=>{const n=Date.now();if(n-S.cat>3000)S.cad=0;if(n-S.sat>3000)S.sspd=null;ui()},1000);setInterval(()=>S.rec&&saveDraft(),20000);
 
-let wl;$('#go').onclick=async()=>{if(!S.rec){S.rec=1;S.pause=0;S.t0=Date.now();try{wl=await navigator.wakeLock.request('screen')}catch{}}else S.pause=!S.pause;ui()};
+let wl;const wake=async()=>{try{wl=await navigator.wakeLock.request('screen')}catch{}};
+$('#go').onclick=()=>{const n=Date.now();
+ if(!S.rec){if(typeof alertReset=='function')alertReset();Object.assign(S,{rec:1,pause:0,t0:n,pms:0,pst:0,pts:[],dist:0,gain:0,mov:0,max:0,lf:0});S.ac.list=[];wake()}
+ else if(!S.pause){S.pause=1;S.pst=n}else{S.pms+=n-S.pst;S.pause=0}
+ ui();saveDraft()};
 $('#end').onclick=async()=>{if(!S.rec||!confirm('¿Terminar y guardar la actividad?'))return;
- if(S.pts.length>10){const a={id:Date.now(),t0:S.t0,dist:S.dist,el:S.el,mov:S.mov,gain:S.gain,pts:S.pts};await tx('readwrite',s=>s.put(a));toast('Actividad guardada')}
- Object.assign(S,{rec:0,pause:0,pts:[],dist:0,gain:0,mov:0,el:0,max:0});if(trk)trk.setLatLngs([]);try{wl&&wl.release()}catch{}ui();list()};
+ const el=getEl();
+ if(S.pts.length>10){const a={id:Date.now(),t0:S.t0,uid:S.uid,sport:S.sport,bike:S.bike,dist:S.dist,el,mov:S.mov,gain:S.gain,pts:S.pts,climbs:S.ac.list};await tx('readwrite',s=>s.put(a));toast('Actividad guardada')}
+ await tx('readwrite',s=>s.delete('draft'));
+ Object.assign(S,{rec:0,pause:0,pts:[],dist:0,gain:0,mov:0,max:0,pms:0});S.ac.list=[];if(trk)trk.setLatLngs([]);try{wl&&wl.release()}catch{}ui();list()};
 
 /* ---------- Campos de datos y pantallas personalizables ---------- */
+const getEl=()=>S.rec?((S.pause?S.pst:Date.now())-S.t0-S.pms)/1000:0;
+const pace=v=>{if(v<1)return'–';const q=Math.round(3600/v);return Math.floor(q/60)+':'+String(q%60).padStart(2,'0')};
 const CAT={spd:['Velocidad','km/h',()=>S.spd.toFixed(1)],avg:['Vel. promedio','km/h',()=>S.mov?(S.dist/S.mov*3.6).toFixed(1):'0.0'],max:['Vel. máxima','km/h',()=>S.max.toFixed(1)],
- time:['Tiempo','',()=>fmtT(S.el)],dist:['Distancia','km',()=>(S.dist/1000).toFixed(2)],grade:['Pendiente','%',()=>S.grade.toFixed(1)],
+ time:['Tiempo','',()=>fmtT(getEl())],dist:['Distancia','km',()=>(S.dist/1000).toFixed(2)],grade:['Pendiente','%',()=>S.grade.toFixed(1)],
  alt:['Altitud','m',()=>S.alt==null?'–':Math.round(S.alt)],gain:['Desnivel +','m',()=>Math.round(S.gain)],
  hr:['Pulso','lpm',()=>S.hr||'–'],cad:['Cadencia','rpm',()=>Math.round(S.cad)||'–'],pow:['Potencia','W',()=>S.pow||'–'],
  clock:['Hora','',()=>new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})],
  left:['Ruta restante','km',()=>S.left==null?'–':km(S.left)],eta:['Llegada en','min',()=>S.left==null?'–':Math.round(S.left/1000/Math.max(S.spd,10)*60)],
- map:['Mapa'],climb:['ClimbPro']};
-const DEF=[[['map'],['spd','time','dist']],[['spd','hr'],['cad','pow'],['grade','alt'],['time','dist']],[['climb'],['grade','gain','alt']]];
-try{pages=JSON.parse(localStorage.pages);if(!Array.isArray(pages)||!pages.length)throw 0}catch{pages=JSON.parse(JSON.stringify(DEF))}
-pg=Math.min(+localStorage.pg||0,pages.length-1);
+ pace:['Ritmo','min/km',()=>pace(S.spd)],avgpace:['Ritmo prom.','min/km',()=>pace(S.mov?S.dist/S.mov*3.6:0)],map:['Mapa'],climb:['ClimbPro']};
+const DEFS={ride:[[['map'],['spd','time','dist']],[['spd','hr'],['cad','pow'],['grade','alt'],['time','dist']],[['climb'],['grade','gain','alt']]],run:[[['map'],['pace','time','dist']],[['pace','hr'],['avgpace','dist'],['time','alt'],['gain','clock']]]};
+const DEF=()=>JSON.parse(JSON.stringify(DEFS[S.sport]||DEFS.ride));
+function loadPages(){try{pages=JSON.parse(localStorage['pages_'+S.sport]);if(!Array.isArray(pages)||!pages.length)throw 0}catch{pages=DEF()}pg=Math.min(+localStorage['pg_'+S.sport]||0,pages.length-1)}
 function ui(){document.querySelectorAll('[data-f]').forEach(e=>{e.textContent=CAT[e.dataset.f][2]();if(e.dataset.f=='grade')e.style.color=S.grade<0?'#5aa9ff':gc(S.grade)});
  $('#go').textContent=!S.rec?'Iniciar':S.pause?'Reanudar':'Pausar'}
 function render(){pg=Math.min(pg,pages.length-1);$('#holder').append($('#mapbox'),$('#climbbox'));
@@ -91,8 +99,9 @@ function render(){pg=Math.min(pg,pages.length-1);$('#holder').append($('#mapbox'
    r.append(c)});return r}));
  $('#dots').textContent=pages.map((_,i)=>i==pg?'●':'○').join(' ');
  if($('#screen').querySelector('#mapbox')){sizeMap();initMap();map&&map.invalidateSize();applyFollow()}
+ $('#screen').querySelector('#mapbox')?$('#mapbox').prepend($('#nav')):$('#ride').prepend($('#nav'));
  if(S.route)profs(S.route);ui()}
-const goPage=d=>{pg=(pg+d+pages.length)%pages.length;localStorage.pg=pg;render()};
+const goPage=d=>{pg=(pg+d+pages.length)%pages.length;localStorage['pg_'+S.sport]=pg;render()};
 $('#pv').onclick=()=>goPage(-1);$('#nx').onclick=()=>goPage(1);
 let sx=null;$('#screen').addEventListener('touchstart',e=>{sx=e.target.closest('#mapbox')?null:e.touches[0].clientX},{passive:true});
 $('#screen').addEventListener('touchend',e=>{if(sx==null)return;const dx=e.changedTouches[0].clientX-sx;sx=null;if(Math.abs(dx)>70)goPage(dx<0?1:-1)},{passive:true});
@@ -180,7 +189,17 @@ function guide(cur){const tot=S.route.at(-1).d,left=tot-cur,n=S.cues.find(c=>c.d
 function offRoute(){S.left=null;set('nv-i','⚠');set('nv-t','Fuera de ruta');set('nv-d','');$('#nav').classList.remove('hide');
  if(!S.dest)return;const n=Date.now();if(!offT)offT=n;
  if(n-offT>15000&&n-(S.lastRe||0)>30000){S.lastRe=n;offT=0;say('Recalculando ruta');navTo(S.dest)}}
-function climbpro(){const R=S.route;if(!R||!S.lat)return;
+function liveClimb(){const a=S.ac,g=S.grade,o=S.odo,st=o-(a.lo==null?o:a.lo);a.lo=o;if(S.alt==null)return;
+ if(g>=2)a.dip=0;else a.dip+=st;
+ if(!a.on){if(!a.cs&&g>=3)a.cs={d:o,a:S.alt};
+  if(a.cs){if(a.dip>150)a.cs=null;else{const L=o-a.cs.d,G=S.alt-a.cs.a;if(L>=300&&G/L*100>=3){a.on=1;a.pr=[{d:a.cs.d,a:a.cs.a}]}}}}
+ if(a.on){const l=a.pr.at(-1);if(o-l.d>=50)a.pr.push({d:o,a:S.alt});
+  if(a.dip>150){const f=a.pr[0],L=o-a.dip-f.d,G=l.a-f.a;a.on=0;a.cs=null;a.dip=0;
+   if(L>=500&&G>=25){a.list.push({len:L,gain:G,avg:G/L*100,t:Date.now()});say('Subida terminada: '+Math.round(G)+' metros de desnivel')}a.pr=[]}}}
+function liveClimbUI(){const a=S.ac;
+ if(a.on&&a.pr.length>1){const f=a.pr[0],L=S.odo-f.d,G=S.alt-f.a;setCp(`Subida en curso · ${km(L)} km · +${Math.round(G)} m · ${(G/Math.max(L,1)*100).toFixed(1)}% prom. · ahora ${S.grade.toFixed(1)}%`);profs(a.pr)}
+ else{profs([]);const q=a.list.at(-1);setCp(a.cs?'Posible subida…':q?`Subidas de hoy: ${a.list.length} · última ${km(q.len)} km · ${q.avg.toFixed(1)}%`:'ClimbPro automático: se activa solo cuando empiezas a subir.')}}
+function climbpro(){const R=S.route;if(!R){liveClimbUI();return}if(!S.lat)return;
  const lo=S.ridx<0?0:Math.max(0,S.ridx-10),hi=S.ridx<0?R.length:Math.min(R.length,S.ridx+200);let b=1e9,bi=-1;
  for(let i=lo;i<hi;i++){const d=hav(S.lat,S.lon,R[i].lat,R[i].lon);if(d<b){b=d;bi=i}}
  if(b>60){S.ridx=-1;offRoute();return setCp('Fuera de la ruta')}
@@ -190,7 +209,7 @@ function climbpro(){const R=S.route;if(!R||!S.lat)return;
  else{const n=S.climbs.find(c=>c.s>cur);
   setCp(n?`Próxima subida en ${km(n.s-cur)} km: ${km(n.len)} km · ${n.avg.toFixed(1)}% · +${Math.round(n.gain)} m`:'No quedan subidas');profs(R,cur)}}
 function clearRoute(){S.route=null;S.cues=[];S.climbs=[];S.dest=null;S.ridx=-1;S.left=null;['route','cues','dest'].forEach(k=>localStorage.removeItem(k));
- $('#nav').classList.add('hide');$('#clist').textContent='';setCp('Carga o calcula una ruta para ver ClimbPro');drawRoute(null);const c=$('#cpc');c.getContext('2d').clearRect(0,0,c.width,c.height)}
+ $('#nav').classList.add('hide');$('#clist').textContent='';setCp('ClimbPro automático: se activa solo cuando empiezas a subir.');drawRoute(null);const c=$('#cpc');c.getContext('2d').clearRect(0,0,c.width,c.height)}
 $('#gpxf').onchange=async e=>{const f=e.target.files[0];if(!f)return;
  const x=new DOMParser().parseFromString(await f.text(),'text/xml');
  const P=[...x.querySelectorAll('trkpt,rtept')].map(p=>({lat:+p.getAttribute('lat'),lon:+p.getAttribute('lon'),a:p.querySelector('ele')?+p.querySelector('ele').textContent:null}));
@@ -205,7 +224,7 @@ $('#qb').onclick=async()=>{const q=$('#q').value.trim();if(!q)return;
 /* ---------- Menú y editor de pantallas ---------- */
 $('#mn').onclick=()=>$('#menu').classList.remove('hide');$('#mx').onclick=()=>$('#menu').classList.add('hide');
 $('#edb').onclick=()=>{$('#menu').classList.add('hide');ep=pg;editor();$('#ed').classList.remove('hide')};
-$('#edok').onclick=()=>{localStorage.pages=JSON.stringify(pages);$('#ed').classList.add('hide');pg=Math.min(ep,pages.length-1);localStorage.pg=pg;render()};
+$('#edok').onclick=()=>{localStorage['pages_'+S.sport]=JSON.stringify(pages);$('#ed').classList.add('hide');pg=Math.min(ep,pages.length-1);localStorage['pg_'+S.sport]=pg;render()};
 function editor(){const root=$('#edc'),P=pages[ep];root.replaceChildren();
  const tabs=document.createElement('div');tabs.className='bar';
  pages.forEach((_,i)=>{const b=btn('Pantalla '+(i+1),()=>{ep=i;editor()});if(i==ep)b.className='on';tabs.append(b)});
@@ -219,25 +238,4 @@ function editor(){const root=$('#edc'),P=pages[ep];root.replaceChildren();
   root.append(d)});
  const c=document.createElement('div');c.className='bar';
  c.append(btn('+ Fila',()=>{P.push(['spd','time']);editor()}),btn('Borrar pantalla',()=>{if(pages.length>1&&confirm('¿Borrar esta pantalla?')){pages.splice(ep,1);ep=0;editor()}}),
-  btn('Restablecer',()=>{if(confirm('¿Restablecer las pantallas originales?')){pages=JSON.parse(JSON.stringify(DEF));ep=0;editor()}}));root.append(c)}
-
-/* ---------- Actividades ---------- */
-async function list(){const a=(await tx('readonly',s=>s.getAll())).sort((x,y)=>y.id-x.id);
- $('#acts').innerHTML=a.length?a.map(x=>`<div class="card" data-id="${x.id}" style="cursor:pointer"><b>${new Date(x.t0).toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'short'})}</b><div class="row"><span>${km(x.dist)} km</span><span>${fmtT(x.mov)}</span><span>+${Math.round(x.gain)} m</span><span>${x.mov?(x.dist/x.mov*3.6).toFixed(1):0} km/h</span></div></div>`).join(''):'<p class="mut">Aún no hay actividades. Termina una rodada y aparecerá aquí.</p>';
- document.querySelectorAll('#acts .card').forEach(c=>c.onclick=()=>detail(a.find(x=>x.id==c.dataset.id)))}
-function toGpx(a){return `<?xml version="1.0"?><gpx version="1.1" creator="Rodada" xmlns="http://www.topografix.com/GPX/1/1" xmlns:g="http://www.garmin.com/xmlschemas/TrackPointExtension/v1"><trk><name>Rodada ${new Date(a.t0).toISOString()}</name><trkseg>${a.pts.map(p=>`<trkpt lat="${p[1]}" lon="${p[2]}"><ele>${p[3]??0}</ele><time>${new Date(p[0]).toISOString()}</time><extensions><g:TrackPointExtension>${p[4]?`<g:hr>${p[4]}</g:hr>`:''}${p[5]?`<g:cad>${p[5]}</g:cad>`:''}</g:TrackPointExtension></extensions></trkpt>`).join('')}</trkseg></trk></gpx>`}
-function detail(a){const avg=i=>{const v=a.pts.map(p=>p[i]).filter(Boolean);return v.length?Math.round(v.reduce((s,x)=>s+x,0)/v.length):'–'};
- const r=resample(a.pts.map(p=>({lat:p[1],lon:p[2],a:p[3]}))),cl=findClimbs(r),mx=Math.max(...a.pts.map(p=>p[7]||0));
- $('#det').innerHTML=`<div class="card"><b>Detalle</b><div class="row"><span>Prom. ${a.mov?(a.dist/a.mov*3.6).toFixed(1):0} km/h</span><span>Máx. ${mx.toFixed(1)} km/h</span><span>Pulso prom. ${avg(4)}</span><span>Cad. prom. ${avg(5)}</span><span>Potencia prom. ${avg(6)} W</span></div>
- <canvas id="dc" style="width:100%;height:90px"></canvas><div class="row">${cl.map((c,i)=>`<span style="color:${gc(c.avg)}">Subida ${i+1}: ${km(c.len)} km · ${c.avg.toFixed(1)}% · +${Math.round(c.gain)} m</span>`).join('')||'Sin subidas categorizadas'}</div>
- <div class="bar"><button id="gx">Exportar GPX</button><button id="dl">Borrar</button></div></div>`;
- prof($('#dc'),r);
- $('#gx').onclick=()=>{const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([toGpx(a)],{type:'application/gpx+xml'}));l.download=`rodada-${a.id}.gpx`;l.click()};
- $('#dl').onclick=async()=>{if(confirm('¿Borrar esta actividad?')){await tx('readwrite',s=>s.delete(a.id));$('#det').innerHTML='';list()}}}
-
-/* ---------- Inicio ---------- */
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
- ['ride','acts-v'].forEach(id=>$('#'+id).classList.toggle('hide',id!==b.dataset.t));if(b.dataset.t=='ride')render()});
-if(localStorage.route){try{S.dest=JSON.parse(localStorage.dest||'null')}catch{}
- setRoute(JSON.parse(localStorage.route).map(p=>({d:p[0],a:p[1],lat:p[2],lon:p[3]})),localStorage.cues?JSON.parse(localStorage.cues):null)}
-render();list();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+  btn('Restablecer',()=>{if(confirm('¿Restablecer las pantallas originales?')){pages=DEF();ep=0;editor()}}));root.append(c)}
