@@ -5,7 +5,7 @@ const km=m=>(m/1000).toFixed(1);
 const rad=Math.PI/180,hav=(a,b,c,d)=>{const p=(c-a)*rad,q=(d-b)*rad,x=Math.sin(p/2)**2+Math.cos(a*rad)*Math.cos(c*rad)*Math.sin(q/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
 const gc=g=>g<3?'#2f9e5b':g<6?'#e6c229':g<9?'#f08a24':g<12?'#d9363e':'#8a1130'; // colores ClimbPro
 const S={rec:0,pause:0,pts:[],dist:0,odo:0,gain:0,mov:0,el:0,max:0,hr:0,cad:0,pow:0,sspd:null,sat:0,cat:0,spd:0,grade:0,alt:null,buf:[],last:null,lat:0,lon:0,ridx:-1,route:null,climbs:[],cues:[],dest:null,hdg:0,left:null};
-Object.assign(S,{uid:'u1',sport:'ride',bike:'road',pms:0,pst:0,lf:0,ac:{on:0,cs:null,dip:0,pr:[],list:[],lo:null}});
+Object.assign(S,{uid:'u1',sport:'ride',bike:'road',pms:0,pst:0,lf:0,rej:0,seg:0,lft:0,ac:{on:0,cs:null,dip:0,pr:[],list:[],lo:null}});
 let wheel=(+localStorage.wheel||2105)/1000,map,mk,line,trk,follow=true,voice=true,said={},offT=0,pages,pg=0,ep=0;
 $('#wh').value=wheel*1000;$('#wh').onchange=e=>{wheel=e.target.value/1000;localStorage.wheel=e.target.value};
 const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',4000)};
@@ -46,34 +46,37 @@ async function link(k,btn){
 document.querySelectorAll('[data-bt]').forEach(b=>b.onclick=()=>link(b.dataset.bt,b));
 
 /* ---------- GPS en tiempo real ---------- */
-const onFix=c=>{if(c.accuracy>30)return;
+const onFix=(c,ts)=>{if(c.accuracy>30)return;const now=ts||Date.now();let pr=S.last,brk=false;
+ if(pr){const dt=Math.max((now-(S.lft||pr.t))/1000,.5),d0=hav(pr.lat,pr.lon,c.latitude,c.longitude); // salto imposible = lectura GPS falsa
+  if(d0/dt>(S.sport=='run'?9:28)){if(++S.rej<5)return;S.rej=0;pr=null;brk=true}else S.rej=0}
+ if(S.lft&&now-S.lft>30000)brk=true;S.lft=now;if(brk){S.seg++;S.buf=[]}
  S.lat=c.latitude;S.lon=c.longitude;
  if(c.altitude!=null)S.alt=S.alt==null?c.altitude:S.alt+.25*(c.altitude-S.alt);
- const gs=c.speed!=null?c.speed*3.6:null,pr=S.last,dd=pr?hav(pr.lat,pr.lon,c.latitude,c.longitude):0;
+ const gs=c.speed!=null?c.speed*3.6:null,dd=pr?hav(pr.lat,pr.lon,c.latitude,c.longitude):0;
  if(!pr||dd>=2){
   if(pr){S.odo+=dd;if(S.rec&&!S.pause){S.dist+=dd;if(S.alt!=null&&pr.alt!=null&&S.alt>pr.alt)S.gain+=S.alt-pr.alt}}
-  S.last={lat:c.latitude,lon:c.longitude,alt:S.alt};
+  S.last={lat:c.latitude,lon:c.longitude,alt:S.alt,t:now};
   S.buf.push({d:S.odo,a:S.alt});while(S.buf.length>2&&S.buf[1].d<=S.odo-50)S.buf.shift();
   const f=S.buf[0],l=S.buf.at(-1),sp=l.d-f.d;
   if(sp>=30&&f.a!=null&&l.a!=null)S.grade+=.3*(Math.max(-25,Math.min(25,(l.a-f.a)/sp*100))-S.grade)}
  S.spd=S.sspd!=null?S.sspd:(gs||0);
  const nw=Date.now(),dtf=S.lf?Math.min((nw-S.lf)/1000,10):0;S.lf=nw;if(S.rec&&!S.pause&&S.spd>1.5)S.mov+=dtf;
- if(S.rec&&!S.pause){if(S.spd<90)S.max=Math.max(S.max,S.spd);S.pts.push([Date.now(),+c.latitude.toFixed(6),+c.longitude.toFixed(6),S.alt==null?null:+S.alt.toFixed(1),S.hr||null,Math.round(S.cad)||null,S.pow||null,+S.spd.toFixed(1)])}
- liveClimb();mapUpd(c);climbpro();ui()};
-if(NAT)NAT.BackgroundGeolocation.addWatcher({backgroundTitle:'Rodada',backgroundMessage:'Registrando tu rodada',requestPermissions:true,stale:false,distanceFilter:0},(l,e)=>{if(e)return toast('GPS: '+(e.message||e.code));l&&onFix(l)});
-else navigator.geolocation.watchPosition(p=>onFix(p.coords),e=>toast('GPS: '+e.message),{enableHighAccuracy:true,maximumAge:0});
+ if(S.rec&&!S.pause){if(S.spd<90)S.max=Math.max(S.max,S.spd);S.pts.push([Date.now(),+c.latitude.toFixed(6),+c.longitude.toFixed(6),S.alt==null?null:+S.alt.toFixed(1),S.hr||null,Math.round(S.cad)||null,S.pow||null,+S.spd.toFixed(1),S.seg])}
+ liveClimb();mapUpd(c,brk);climbpro();ui()};
+if(NAT)NAT.BackgroundGeolocation.addWatcher({backgroundTitle:'Rodada',backgroundMessage:'Registrando tu rodada',requestPermissions:true,stale:false,distanceFilter:0},(l,e)=>{if(e)return toast('GPS: '+(e.message||e.code));l&&onFix(l,l.time)});
+else navigator.geolocation.watchPosition(p=>onFix(p.coords,p.timestamp),e=>toast('GPS: '+e.message),{enableHighAccuracy:true,maximumAge:0});
 setInterval(()=>{const n=Date.now();if(n-S.cat>3000)S.cad=0;if(n-S.sat>3000)S.sspd=null;ui()},1000);setInterval(()=>S.rec&&saveDraft(),20000);
 
 let wl;const wake=async()=>{try{wl=await navigator.wakeLock.request('screen')}catch{}};
 $('#go').onclick=()=>{const n=Date.now();
- if(!S.rec){if(typeof alertReset=='function')alertReset();Object.assign(S,{rec:1,pause:0,t0:n,pms:0,pst:0,pts:[],dist:0,gain:0,mov:0,max:0,lf:0});S.ac.list=[];wake()}
+ if(!S.rec){if(typeof alertReset=='function')alertReset();Object.assign(S,{rec:1,pause:0,t0:n,pms:0,pst:0,pts:[],dist:0,gain:0,mov:0,max:0,lf:0,seg:0,rej:0,lft:0});S.ac.list=[];wake()}
  else if(!S.pause){S.pause=1;S.pst=n}else{S.pms+=n-S.pst;S.pause=0}
  ui();saveDraft()};
 $('#end').onclick=async()=>{if(!S.rec||!confirm('¿Terminar y guardar la actividad?'))return;
  const el=getEl();
  if(S.pts.length>10){const a={id:Date.now(),t0:S.t0,uid:S.uid,sport:S.sport,bike:S.bike,dist:S.dist,el,mov:S.mov,gain:S.gain,pts:S.pts,climbs:S.ac.list};await tx('readwrite',s=>s.put(a));toast('Actividad guardada')}
  await tx('readwrite',s=>s.delete('draft'));
- Object.assign(S,{rec:0,pause:0,pts:[],dist:0,gain:0,mov:0,max:0,pms:0});S.ac.list=[];if(trk)trk.setLatLngs([]);try{wl&&wl.release()}catch{}ui();list()};
+ Object.assign(S,{rec:0,pause:0,pts:[],dist:0,gain:0,mov:0,max:0,pms:0});S.ac.list=[];trkClear();try{wl&&wl.release()}catch{}ui();list()};
 
 /* ---------- Campos de datos y pantallas personalizables ---------- */
 const getEl=()=>S.rec?((S.pause?S.pst:Date.now())-S.t0-S.pms)/1000:0;
@@ -113,17 +116,20 @@ addEventListener('resize',sizeMap);
 function initMap(){if(map||!window.L)return;
  map=L.map('map',{zoomControl:false,attributionControl:false}).setView([S.lat||4.65,S.lon||-74.08],17);
  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
- line=L.polyline([],{color:'#ffd23f',weight:6,opacity:.9}).addTo(map);trk=L.polyline([],{color:'#5aa9ff',weight:4}).addTo(map);
+ line=L.polyline([],{color:'#ffd23f',weight:6,opacity:.9}).addTo(map);
  mk=L.circleMarker([S.lat||0,S.lon||0],{radius:9,color:'#fff',weight:3,fillColor:'#d9363e',fillOpacity:1}).addTo(map);
  map.on('dragstart',()=>{follow=false;$('#fl').classList.remove('on');applyFollow()});
  map.on('contextmenu',e=>{if(confirm('¿Ir a este punto?'))navTo({lat:e.latlng.lat,lon:e.latlng.lng,name:'Punto en el mapa'})});
+ S.pts.forEach((p,i)=>trkAdd([p[1],p[2]],i>0&&(p[8]||0)!==(S.pts[i-1][8]||0)));
  if(S.route)drawRoute(S.route)}
+let trkAll=[];function trkAdd(ll,brk){if(!map)return;if(brk||!trk){trk=L.polyline([],{color:'#5aa9ff',weight:4}).addTo(map);trkAll.push(trk)}trk.addLatLng(ll)}
+function trkClear(){trkAll.forEach(t=>t.remove());trkAll=[];trk=null}
 function drawRoute(r){if(map)line.setLatLngs(r?r.map(p=>[p.lat,p.lon]):[])}
 function rot(){$('#mapwrap').style.transform=follow?`rotate(${-S.hdg}deg)`:'none'}
 function applyFollow(){const on=follow&&!!map;$('#arrow').style.display=on?'block':'none';if(mk)mk.setStyle({opacity:on?0:1,fillOpacity:on?0:1});rot()}
-function mapUpd(c){if(!map)return;const ll=[c.latitude,c.longitude],hd=c.heading!=null&&!isNaN(c.heading)?c.heading:c.bearing;
+function mapUpd(c,brk){if(!map)return;const ll=[c.latitude,c.longitude],hd=c.heading!=null&&!isNaN(c.heading)?c.heading:c.bearing;
  if((c.speed||0)>1&&hd!=null&&!isNaN(hd))S.hdg=(S.hdg+(((hd-S.hdg+540)%360)-180)*.4+360)%360;
- mk.setLatLng(ll);if(S.rec&&!S.pause)trk.addLatLng(ll);
+ mk.setLatLng(ll);if(S.rec&&!S.pause)trkAdd(ll,brk);
  if(follow){map.setView(ll,map.getZoom(),{animate:false});rot()}}
 $('#zi').onclick=()=>map&&map.zoomIn();$('#zo').onclick=()=>map&&map.zoomOut();
 $('#fl').onclick=()=>{follow=!follow;$('#fl').classList.toggle('on',follow);applyFollow();if(follow&&map&&S.lat)map.setView([S.lat,S.lon],map.getZoom())};
@@ -131,7 +137,7 @@ $('#fl').onclick=()=>{follow=!follow;$('#fl').classList.toggle('on',follow);appl
 /* ---------- Rutas, ClimbPro y navegación ---------- */
 function smooth(o){return o.map((p,i)=>{const w=o.slice(Math.max(0,i-2),i+3);return{...p,a:w.reduce((s,x)=>s+x.a,0)/w.length}})}
 function resample(P){P=P.filter(p=>p.a!=null);if(P.length<2)return[];let cum=0,nx=50;const out=[{d:0,a:P[0].a,lat:P[0].lat,lon:P[0].lon}];
- for(let i=1;i<P.length;i++){const q=P[i-1],dd=hav(q.lat,q.lon,P[i].lat,P[i].lon);
+ for(let i=1;i<P.length;i++){const q=P[i-1],dd=P[i].brk?0:hav(q.lat,q.lon,P[i].lat,P[i].lon);
   while(dd>0&&cum+dd>=nx){const f=(nx-cum)/dd;out.push({d:nx,a:q.a+(P[i].a-q.a)*f,lat:q.lat+(P[i].lat-q.lat)*f,lon:q.lon+(P[i].lon-q.lon)*f});nx+=50}cum+=dd}
  return smooth(out)}
 function findClimbs(r){const g=[];for(let i=0;i<r.length-1;i++)g.push((r[i+1].a-r[i].a)/(r[i+1].d-r[i].d)*100);

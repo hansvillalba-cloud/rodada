@@ -42,9 +42,6 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;padding:8px 12px
 .col{display:grid;gap:10px}.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.tile{background:var(--bg);border-radius:8px;padding:8px 4px;text-align:center}.tile b{display:block;font-size:19px}.tile span{font-size:11px;color:var(--mut)}
 .zr{display:grid;grid-template-columns:96px 1fr 56px;gap:6px;align-items:center;font-size:13px}.zr i{display:block;height:12px;border-radius:6px;background:var(--ac)}
 table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}td,th{padding:4px 2px;text-align:right;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:400}td:first-child,th:first-child{text-align:left}
-.vid{position:relative;aspect-ratio:3/4;max-height:56vh;margin:auto;width:100%;background:#000;border-radius:10px;overflow:hidden}.vid video,.vid canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}.vid.mir video,.vid.mir canvas{transform:scaleX(-1)}
-#cue{position:absolute;left:8px;right:8px;bottom:8px;padding:8px;border-radius:8px;background:#0b1523e6;text-align:center;font-size:20px;font-weight:700}#cue.ok{color:#7ee2a0}#cue.warn{color:#e6c229}#cue.bad{color:#ff6b6b}
-.srow{display:flex;justify-content:space-between;align-items:center}.srow b#sx-rep{font-size:56px;color:var(--ac);line-height:1}.pb{height:10px;background:var(--panel);border-radius:5px;overflow:hidden}.pb i{display:block;height:100%;width:0;background:#2f9e5b}
 .irow{display:flex;gap:6px;flex-wrap:wrap}.irow select{flex:2 1 120px}.irow input{flex:1 1 64px;width:64px}
 #alert{position:fixed;top:calc(12px + env(safe-area-inset-top));left:12px;right:12px;z-index:35;padding:16px;border-radius:12px;font-size:26px;font-weight:700;text-align:center;background:#ffd23f;color:#10202f}#alert.red{background:#d9363e;color:#fff}#alert.hide{display:none}
 </style></head><body>
@@ -59,26 +56,11 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
   <div class="mbtn"><button id="zi" aria-label="Acercar">+</button><button id="zo" aria-label="Alejar">−</button><button id="fl" class="on" aria-label="Seguir">◎</button></div></div>
  <div id="climbbox"><div id="cpt">ClimbPro automático: se activa solo al subir (o carga una ruta).</div><div class="cvw"><canvas id="cpc"></canvas></div></div>
 </div>
-<section id="str-v" class="hide">
- <div id="str-setup" class="col"><h2>Fuerza en casa</h2>
-  <div class="bar"><select id="rt" aria-label="Rutina"></select><button id="rtn">+ Rutina</button></div>
-  <div id="rtc" class="col"></div>
-  <p class="mut">Apoya el celular a unos 2 m, con todo tu cuerpo a la vista (de lado o a 45°). Solo cuentan las repeticiones bien hechas.</p>
-  <button id="rts" class="pri">Iniciar sesión</button></div>
- <div id="str-run" class="hide col">
-  <div class="vid mir" id="vid"><video id="cam" playsinline muted></video><canvas id="ov"></canvas><div id="cue">Preparando…</div></div>
-  <div class="srow"><div><b id="sx-name"></b><div class="mut" id="sx-set"></div></div><b id="sx-rep">0/0</b></div>
-  <div class="pb"><i id="sx-bar"></i></div><div id="sx-msg" class="mut"></div>
-  <div class="bar"><button id="sx-man">+1 manual</button><button id="sx-skip">Saltar</button><button id="sx-flip">Cámara</button><button id="sx-end">Terminar</button></div></div>
-</section>
-<section id="fit-v" class="hide col"><h2>Bike fitting</h2>
- <p class="mut">Pon el celular de lado (perpendicular a la bici), a 2–3 m y a la altura de la cadera, con bici y cuerpo completos. Usa rodillo o bici apoyada y pedalea suave 15 s. El tipo de bici se toma del menú ☰.</p>
- <div id="fit-host"></div><div id="fit-gauges" class="col"></div>
- <div class="bar"><button id="fit-go" class="pri">Medir</button><button id="fit-save">Guardar</button></div></section>
 <section id="acts-v" class="hide"><h2>Actividades</h2><div id="sum" class="card"></div><div id="acts"></div><div id="det"></div></section>
 <div id="menu" class="ov hide"><h2>Menú</h2>
  <h3>Usuario</h3><div class="bar"><select id="usr" aria-label="Usuario"></select><button id="usn">+ Nuevo</button></div>
  <div class="bar"><label>FC máx <input type="number" id="u-hr"></label><label>FTP (W) <input type="number" id="u-ftp"></label><label>Peso (kg) <input type="number" id="u-kg"></label></div>
+ <div class="bar"><label>Edad <input type="number" id="u-age"></label><label>Sexo <select id="u-sex"><option value="M">Hombre</option><option value="F">Mujer</option></select></label></div>
  <h3>Actividad</h3><div class="bar"><select id="sport" aria-label="Deporte"><option value="ride">Ciclismo</option><option value="run">Correr</option></select><select id="bike" aria-label="Tipo de bicicleta"></select></div>
  <h3>Sensores Bluetooth</h3><div class="bar"><button data-bt="hr">Pulso</button><button data-bt="csc">Vel./Cad.</button><button data-bt="pow">Potencia</button></div>
  <h3>Navegación</h3><div class="bar"><input id="q" type="search" placeholder="Buscar destino…"><button id="qb">Buscar</button></div><div id="qr"></div>
@@ -90,5 +72,5 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
  <h3>Rueda</h3><label>Circunferencia (mm) <input type="number" id="wh" value="2105"></label>
  <button id="mx" class="pri">Cerrar</button></div>
 <div id="ed" class="ov hide"><h2>Personalizar pantallas</h2><div id="edc"></div><button id="edok" class="pri">Listo</button></div>
-<nav><button data-t="ride" class="on">Rodar</button><button data-t="str-v">Fuerza</button><button data-t="fit-v">Postura</button><button data-t="acts-v">Actividades</button></nav>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script><script src="native.js"></script><script src="app.js"></script><script src="analysis.js"></script><script src="strength.js"></script><script src="fit.js"></script><script src="alerts.js"></script><script src="main.js"></script></body></html>
+<nav><button data-t="ride" class="on">Rodar</button><button data-t="acts-v">Actividades</button></nav>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script><script src="native.js"></script><script src="app.js"></script><script src="analysis.js"></script><script src="alerts.js"></script><script src="main.js"></script></body></html>

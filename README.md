@@ -40,12 +40,13 @@ Búsqueda: Nominatim; rutas: routing.openstreetmap.de (perfil bicicleta); elevac
 
 ## Novedades
 - **Pantalla apagada:** en la versión nativa (APK) el GPS corre como servicio en primer plano. Además, el tiempo se calcula con el reloj (no con temporizadores) y la actividad se guarda sola cada 20 s; si la app se cierra, al abrirla ofrece recuperarla. En el navegador la pantalla se mantiene encendida, porque los navegadores suspenden el GPS al apagarla.
-- **Usuarios:** menú ☰ → Usuario. Cada usuario tiene su FC máx, FTP y peso, y sus propias actividades, pantallas y rutinas.
+- **Usuarios:** menú ☰ → Usuario. Cada usuario tiene su FC máx, FTP, peso, edad y sexo, y sus propias actividades, pantallas y rutinas.
 - **Análisis por actividad:** resumen, energía estimada, potencia normalizada, gráficos (elevación/velocidad y pulso/potencia/cadencia), zonas de pulso y de potencia, parciales por km, subidas, y resumen de 7 y 30 días.
 - **Indicaciones dentro del mapa:** el banner de giro va sobre el mapa. En pantallas sin mapa aparece arriba.
 - **ClimbPro automático:** sin cargar ruta, detecta que estás subiendo (≥300 m con ≥3 %) y muestra distancia, desnivel y pendiente de la subida en curso, con su perfil. Sin ruta no puede saber cuánto falta; con ruta cargada sí.
 - **Deporte y bicicleta:** Ciclismo o Correr (ritmo en min/km) y tipo de bici (ruta, MTB, gravel, urbana, eléctrica), que ajusta la circunferencia de rueda.
-- **Fuerza en casa (pestaña Fuerza):** cámara + detección de pose (MediaPipe). Sentadillas, flexiones, zancadas y plancha: solo cuentan las repeticiones con buena técnica; muestra el progreso de la serie, cuenta atrás, descanso, voz y sonido. Rutinas con series, repeticiones y descanso, guardadas por usuario.
-  La IA se descarga de internet (jsDelivr y storage.googleapis.com) la primera vez; el modelo `pose_landmarker_lite` no pude comprobarlo desde mi entorno. Coloca el celular a ~2 m, de lado o a 45°.
+
 - **Alertas visuales y sonoras:** menú ☰ → Alertas. Reglas por métrica (pulso, cadencia, velocidad, potencia, pendiente; mayor o menor que un valor, sostenido 5 s), recordatorios de hidratación y comida cada X minutos, y aviso por kilómetro con tiempo y ritmo. Muestran un cartel en pantalla, suenan, vibran y hablan. Se guardan por usuario.
-- **Bike fitting (pestaña Postura):** cámara de lado mientras pedaleas 15 s. Mide la rodilla extendida abajo (altura del sillín), inclinación del torso (según el tipo de bici), codo y ángulo brazo–torso; da recomendaciones y guarda la medición en Actividades. Es una medición 2D con error de ±5° y referencias generales; no sustituye a un fitter profesional.
+- **Filtro de GPS:** se descartan saltos imposibles (más de 28 m/s en bici, 9 m/s corriendo) y, si la posición nueva se mantiene 5 lecturas seguidas, se acepta como un tramo nuevo sin sumar distancia. El mapa y el GPX no dibujan líneas rectas entre tramos, y las actividades antiguas se reparan solas al abrir la lista.
+- **Energía estimada:** con potencia si hay medidor; si no, con pulso (fórmula de Keytel, usa edad, sexo y peso); si no, por velocidad (METs) o distancia al correr. El análisis indica la fuente.
+- Los módulos de fuerza en casa y de postura con cámara se quitaron a pedido.

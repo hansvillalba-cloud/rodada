@@ -1,4 +1,5 @@
 /* Alertas visuales y sonoras (como un ciclocomputador) */
+let AUD;function beep(f=880){try{AUD=AUD||new AudioContext();const o=AUD.createOscillator(),g=AUD.createGain();o.frequency.value=f;g.gain.value=.15;o.connect(g);g.connect(AUD.destination);o.start();o.stop(AUD.currentTime+.1)}catch{}}
 const AM={hr:['Pulso','lpm'],cad:['Cadencia','rpm'],spd:['Velocidad','km/h'],pow:['Potencia','W'],grade:['Pendiente','%']};
 const AV={hr:()=>S.hr,cad:()=>S.cad,spd:()=>S.spd,pow:()=>S.pow,grade:()=>S.grade};
 const defA=()=>({rules:[{m:'hr',c:'gt',v:Math.round((curU().maxHr||190)*.9),on:1},{m:'cad',c:'lt',v:60,on:0},{m:'spd',c:'gt',v:50,on:0},{m:'pow',c:'gt',v:Math.round((curU().ftp||250)*1.2),on:0}],drink:{on:1,min:20},eat:{on:1,min:45},km:{on:1}});
