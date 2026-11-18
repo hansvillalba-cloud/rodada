@@ -43,6 +43,7 @@ Búsqueda: Nominatim; rutas: routing.openstreetmap.de (perfil bicicleta); elevac
 - **Usuarios:** menú ☰ → Usuario. Cada usuario tiene su FC máx, FTP, peso, edad y sexo, y sus propias actividades, pantallas y rutinas.
 - **Análisis por actividad:** resumen, energía estimada, potencia normalizada, gráficos (elevación/velocidad y pulso/potencia/cadencia), zonas de pulso y de potencia, parciales por km, subidas, y resumen de 7 y 30 días.
 - **Indicaciones dentro del mapa:** el banner de giro va sobre el mapa. En pantallas sin mapa aparece arriba.
+- **ClimbPro emergente:** con una ruta cargada o calculada, cuando te acercas a una subida (por defecto a 500 m; se cambia en ☰ → Navegación, 0 la desactiva) aparece un panel sobre cualquier pantalla con distancia al inicio, largo, pendiente promedio, desnivel, categoría aproximada (largo × pendiente) y el perfil coloreado por pendiente. Dentro de la subida muestra lo que queda y tu pendiente actual, al coronar dice «¡Cima!» y se oculta; la ✕ lo cierra para esa subida. Avisa por voz.
 - **ClimbPro automático:** sin cargar ruta, detecta que estás subiendo (≥300 m con ≥3 %) y muestra distancia, desnivel y pendiente de la subida en curso, con su perfil. Sin ruta no puede saber cuánto falta; con ruta cargada sí.
 - **Deporte y bicicleta:** Ciclismo o Correr (ritmo en min/km) y tipo de bici (ruta, MTB, gravel, urbana, eléctrica), que ajusta la circunferencia de rueda.
 

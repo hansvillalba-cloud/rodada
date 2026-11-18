@@ -157,7 +157,7 @@ function cuesFromGeo(r){const o=[];let last=-999;
  for(let i=2;i<r.length-2;i++){const d=(brg(r[i],r[i+2])-brg(r[i-2],r[i])+540)%360-180;
   if(Math.abs(d)>=45&&r[i].d-last>150){last=r[i].d;const rt=d>0,sh=Math.abs(d)>110;o.push({d:r[i].d,lat:r[i].lat,lon:r[i].lon,ic:sh?'↩':rt?'↱':'↰',text:`Gira ${sh?'cerrado ':''}a la ${rt?'derecha':'izquierda'}`})}}
  const e=r.at(-1);o.push({d:e.d,lat:e.lat,lon:e.lon,ic:'⚑',text:'Llegaste al final de la ruta'});return o}
-function setRoute(r,cues){S.cues=cues||cuesFromGeo(r);said={};
+function setRoute(r,cues){S.cues=cues||cuesFromGeo(r);said={};popX=-1;popK=null;popEnd=0;
  try{localStorage.route=JSON.stringify(r.map(p=>[p.d,+p.a.toFixed(1),+p.lat.toFixed(6),+p.lon.toFixed(6)]));localStorage.cues=JSON.stringify(S.cues);localStorage.dest=JSON.stringify(S.dest)}catch{}
  drawRoute(r);S.route=r;S.climbs=findClimbs(r);S.ridx=-1;
  $('#clist').innerHTML=S.climbs.length?S.climbs.map((c,i)=>`<span style="color:${gc(c.avg)}">${i+1}. km ${km(c.s)} · ${km(c.len)} km · ${c.avg.toFixed(1)}% · +${Math.round(c.gain)} m</span>`).join(''):'';
@@ -195,6 +195,28 @@ function guide(cur){const tot=S.route.at(-1).d,left=tot-cur,n=S.cues.find(c=>c.d
 function offRoute(){S.left=null;set('nv-i','⚠');set('nv-t','Fuera de ruta');set('nv-d','');$('#nav').classList.remove('hide');
  if(!S.dest)return;const n=Date.now();if(!offT)offT=n;
  if(n-offT>15000&&n-(S.lastRe||0)>30000){S.lastRe=n;offT=0;say('Recalculando ruta');navTo(S.dest)}}
+/* ---------- ClimbPro emergente: aparece solo al acercarte a una subida ---------- */
+const catOf=(len,avg)=>{const q=len*avg;return q>=80000?'HC':q>=64000?'Cat 1':q>=32000?'Cat 2':q>=16000?'Cat 3':q>=8000?'Cat 4':''};
+let popK=null,popX=-1,popI=-1,popEnd=0;
+const popD=()=>{const v=localStorage.popd;return v==null||v===''?500:+v};
+$('#pop-d').value=popD();$('#pop-d').onchange=e=>{localStorage.popd=Math.max(0,+e.target.value||0);if(!popD())popHide()};
+function popShow(t,s,col,r,m,i){popI=i;$('#cpop').classList.remove('hide');$('#cpop').style.borderLeftColor=col;set('cp-t',t);set('cp-s',s);prof($('#cpc2'),r,m)}
+function popHide(){$('#cpop').classList.add('hide')}
+$('#cp-x').onclick=()=>{popX=popI;popHide()};
+function popup(R,cur,c){const D=popD();if(!D)return popHide();if(Date.now()<popEnd)return;
+ const N=S.climbs.length;
+ if(c){popK=c;const i=S.climbs.indexOf(c);if(popX===i)return popHide();const rem=c.e-cur,asc=R[c.ei].a-R[S.ridx].a,tg=catOf(c.len,c.avg);
+  return popShow(`Subida ${i+1}/${N}${tg?' · '+tg:''}`,`Quedan ${km(rem)} km · +${Math.round(asc)} m · ${(asc/Math.max(rem,1)*100).toFixed(1)}% prom. · ahora ${S.grade.toFixed(1)}%`,gc(c.avg),R.slice(c.si,c.ei+1),cur,i)}
+ if(popK&&cur>=popK.e){const k=popK;popK=null;popEnd=Date.now()+8000;beep(1000);say('Cima');
+  return popShow('¡Cima!',`Subida completada: ${km(k.len)} km · +${Math.round(k.gain)} m · ${k.avg.toFixed(1)}% prom.`,'#7ee2a0',R.slice(k.si,k.ei+1),k.e,-1)}
+ const n=S.climbs.find(k=>k.s>cur);
+ if(n&&n.s-cur<=D){const i=S.climbs.indexOf(n);if(popX===i)return popHide();const tg=catOf(n.len,n.avg);
+  popShow(`Subida ${i+1}/${N}${tg?' · '+tg:''} en ${Math.max(10,Math.round((n.s-cur)/10)*10)} m`,`${km(n.len)} km · ${n.avg.toFixed(1)}% prom. · +${Math.round(n.gain)} m`,gc(n.avg),R.slice(n.si,n.ei+1),null,i);
+  const k='p'+i;if(!said[k]){said[k]=1;beep(700);say(`Subida en ${D} metros: ${km(n.len)} kilómetros al ${Math.round(n.avg)} por ciento`)}}
+ else popHide()}
+function popLive(L,G){if(!popD())return popHide();const a=S.ac,id=1000+a.list.length;if(popX===id)return popHide();const g=G/Math.max(L,1)*100;
+ popShow('Subida en curso',`${km(L)} km · +${Math.round(G)} m · ${g.toFixed(1)}% prom. · ahora ${S.grade.toFixed(1)}%`,gc(g),a.pr,a.pr.at(-1).d,id)}
+
 function liveClimb(){const a=S.ac,g=S.grade,o=S.odo,st=o-(a.lo==null?o:a.lo);a.lo=o;if(S.alt==null)return;
  if(g>=2)a.dip=0;else a.dip+=st;
  if(!a.on){if(!a.cs&&g>=3)a.cs={d:o,a:S.alt};
@@ -203,19 +225,20 @@ function liveClimb(){const a=S.ac,g=S.grade,o=S.odo,st=o-(a.lo==null?o:a.lo);a.l
   if(a.dip>150){const f=a.pr[0],L=o-a.dip-f.d,G=l.a-f.a;a.on=0;a.cs=null;a.dip=0;
    if(L>=500&&G>=25){a.list.push({len:L,gain:G,avg:G/L*100,t:Date.now()});say('Subida terminada: '+Math.round(G)+' metros de desnivel')}a.pr=[]}}}
 function liveClimbUI(){const a=S.ac;
- if(a.on&&a.pr.length>1){const f=a.pr[0],L=S.odo-f.d,G=S.alt-f.a;setCp(`Subida en curso · ${km(L)} km · +${Math.round(G)} m · ${(G/Math.max(L,1)*100).toFixed(1)}% prom. · ahora ${S.grade.toFixed(1)}%`);profs(a.pr)}
- else{profs([]);const q=a.list.at(-1);setCp(a.cs?'Posible subida…':q?`Subidas de hoy: ${a.list.length} · última ${km(q.len)} km · ${q.avg.toFixed(1)}%`:'ClimbPro automático: se activa solo cuando empiezas a subir.')}}
+ if(a.on&&a.pr.length>1){const f=a.pr[0],L=S.odo-f.d,G=S.alt-f.a;setCp(`Subida en curso · ${km(L)} km · +${Math.round(G)} m · ${(G/Math.max(L,1)*100).toFixed(1)}% prom. · ahora ${S.grade.toFixed(1)}%`);profs(a.pr);popLive(L,G)}
+ else{popHide();profs([]);const q=a.list.at(-1);setCp(a.cs?'Posible subida…':q?`Subidas de hoy: ${a.list.length} · última ${km(q.len)} km · ${q.avg.toFixed(1)}%`:'ClimbPro automático: se activa solo cuando empiezas a subir.')}}
 function climbpro(){const R=S.route;if(!R){liveClimbUI();return}if(!S.lat)return;
  const lo=S.ridx<0?0:Math.max(0,S.ridx-10),hi=S.ridx<0?R.length:Math.min(R.length,S.ridx+200);let b=1e9,bi=-1;
  for(let i=lo;i<hi;i++){const d=hav(S.lat,S.lon,R[i].lat,R[i].lon);if(d<b){b=d;bi=i}}
- if(b>60){S.ridx=-1;offRoute();return setCp('Fuera de la ruta')}
+ if(b>60){S.ridx=-1;offRoute();popHide();return setCp('Fuera de la ruta')}
  S.ridx=bi;const cur=R[bi].d;guide(cur);const c=S.climbs.find(c=>cur>=c.s&&cur<c.e);
  if(c){const rem=c.e-cur,asc=R[c.ei].a-R[bi].a,i=S.climbs.indexOf(c)+1;
   setCp(`Subida ${i}/${S.climbs.length} · quedan ${km(rem)} km · +${Math.round(asc)} m · ${(asc/rem*100).toFixed(1)}% prom.`);profs(R.slice(c.si,c.ei+1),cur)}
  else{const n=S.climbs.find(c=>c.s>cur);
-  setCp(n?`Próxima subida en ${km(n.s-cur)} km: ${km(n.len)} km · ${n.avg.toFixed(1)}% · +${Math.round(n.gain)} m`:'No quedan subidas');profs(R,cur)}}
+  setCp(n?`Próxima subida en ${km(n.s-cur)} km: ${km(n.len)} km · ${n.avg.toFixed(1)}% · +${Math.round(n.gain)} m`:'No quedan subidas');profs(R,cur)}
+ popup(R,cur,c)}
 function clearRoute(){S.route=null;S.cues=[];S.climbs=[];S.dest=null;S.ridx=-1;S.left=null;['route','cues','dest'].forEach(k=>localStorage.removeItem(k));
- $('#nav').classList.add('hide');$('#clist').textContent='';setCp('ClimbPro automático: se activa solo cuando empiezas a subir.');drawRoute(null);const c=$('#cpc');c.getContext('2d').clearRect(0,0,c.width,c.height)}
+ $('#nav').classList.add('hide');popHide();$('#clist').textContent='';setCp('ClimbPro automático: se activa solo cuando empiezas a subir.');drawRoute(null);const c=$('#cpc');c.getContext('2d').clearRect(0,0,c.width,c.height)}
 $('#gpxf').onchange=async e=>{const f=e.target.files[0];if(!f)return;
  const x=new DOMParser().parseFromString(await f.text(),'text/xml');
  const P=[...x.querySelectorAll('trkpt,rtept')].map(p=>({lat:+p.getAttribute('lat'),lon:+p.getAttribute('lon'),a:p.querySelector('ele')?+p.querySelector('ele').textContent:null}));

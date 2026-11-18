@@ -44,11 +44,14 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;gap:8px;padding:8px 12px
 table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}td,th{padding:4px 2px;text-align:right;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:400}td:first-child,th:first-child{text-align:left}
 .irow{display:flex;gap:6px;flex-wrap:wrap}.irow select{flex:2 1 120px}.irow input{flex:1 1 64px;width:64px}
 #alert{position:fixed;top:calc(12px + env(safe-area-inset-top));left:12px;right:12px;z-index:35;padding:16px;border-radius:12px;font-size:26px;font-weight:700;text-align:center;background:#ffd23f;color:#10202f}#alert.red{background:#d9363e;color:#fff}#alert.hide{display:none}
+#cpop{position:absolute;left:6px;right:6px;bottom:84px;z-index:6;background:#0b1523f5;border:1px solid var(--line);border-left:6px solid var(--ac);border-radius:10px;padding:8px 10px;display:grid;gap:4px}#cpop.hide{display:none}
+#cpop .ph{display:flex;justify-content:space-between;align-items:center}#cpop .ph b{font-size:18px}#cpop .ph button{min-height:36px;width:36px;padding:0}#cp-s{font-size:14px;color:var(--mut)}#cpc2{width:100%;height:64px}
 </style></head><body>
 <div id="toast"></div><div id="alert" class="hide" role="alert"></div>
 <section id="ride">
   <div id="screen"></div>
  <div id="dots"></div>
+ <div id="cpop" class="hide" role="status"><div class="ph"><b id="cp-t"></b><button id="cp-x" aria-label="Cerrar aviso de subida">✕</button></div><div id="cp-s"></div><canvas id="cpc2"></canvas></div>
  <div id="ctl"><button id="pv" aria-label="Pantalla anterior">‹</button><button id="go" class="pri">Iniciar</button><button id="end">Terminar</button><button id="nx" aria-label="Pantalla siguiente">›</button><button id="mn" aria-label="Menú">☰</button></div>
 </section>
 <div id="holder" hidden>
@@ -65,6 +68,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:ta
  <h3>Sensores Bluetooth</h3><div class="bar"><button data-bt="hr">Pulso</button><button data-bt="csc">Vel./Cad.</button><button data-bt="pow">Potencia</button></div>
  <h3>Navegación</h3><div class="bar"><input id="q" type="search" placeholder="Buscar destino…"><button id="qb">Buscar</button></div><div id="qr"></div>
  <p class="mut">También puedes mantener presionado el mapa para elegir un destino.</p>
+ <label>Aviso de subida a (m; 0 = desactivar) <input type="number" id="pop-d" min="0"></label>
  <div class="bar"><label class="btn">Cargar ruta GPX<input type="file" id="gpxf" accept=".gpx" hidden></label><button id="xn">Cancelar ruta</button><button id="vz">Voz: sí</button></div>
  <div id="clist" class="row"></div>
  <h3>Alertas</h3><div id="alc" class="col"></div>
