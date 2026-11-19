@@ -14,7 +14,7 @@ async function recoverDraft(){try{const d=(await tx('readonly',s=>s.getAll())).f
  S.uid=d.uid||S.uid;S.sport=d.sport||'ride';S.bike=d.bike||'road';
  Object.assign(S,{rec:1,pause:1,t0:d.t0,pms:d.pms,pst:d.pause?d.pst:d.saved,dist:d.dist,gain:d.gain,mov:d.mov,max:d.max,pts:d.pts,seg:(d.seg||0)+1,lft:0,rej:0});S.ac.list=d.climbs||[];
  usersUI();applySport();toast('Actividad recuperada: pulsa Reanudar')}catch{}}
-document.addEventListener('visibilitychange',()=>{if(document.hidden)saveDraft();else if(S.rec&&!S.pause)wake()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)saveDraft();else if(S.rec&&!S.pause){wake();toast('La app estuvo en segundo plano: el navegador pausa el GPS. Para grabar con la pantalla apagada o usando otras apps, instala el APK.')}});
 addEventListener('pagehide',saveDraft);
 
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));

@@ -5,7 +5,7 @@ const km=m=>(m/1000).toFixed(1);
 const rad=Math.PI/180,hav=(a,b,c,d)=>{const p=(c-a)*rad,q=(d-b)*rad,x=Math.sin(p/2)**2+Math.cos(a*rad)*Math.cos(c*rad)*Math.sin(q/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
 const gc=g=>g<3?'#2f9e5b':g<6?'#e6c229':g<9?'#f08a24':g<12?'#d9363e':'#8a1130'; // colores ClimbPro
 const S={rec:0,pause:0,pts:[],dist:0,odo:0,gain:0,mov:0,el:0,max:0,hr:0,cad:0,pow:0,sspd:null,sat:0,cat:0,spd:0,grade:0,alt:null,buf:[],last:null,lat:0,lon:0,ridx:-1,route:null,climbs:[],cues:[],dest:null,hdg:0,left:null};
-Object.assign(S,{uid:'u1',sport:'ride',bike:'road',pms:0,pst:0,lf:0,rej:0,seg:0,lft:0,ac:{on:0,cs:null,dip:0,pr:[],list:[],lo:null}});
+Object.assign(S,{uid:'u1',sport:'ride',bike:'road',pms:0,pst:0,lf:0,rej:0,seg:0,lft:0,od:[],vd:0,lf2:0,o2:0,gw:0,gref:null,ac:{on:0,cs:null,dip:0,pr:[],list:[],lo:null}});
 let wheel=(+localStorage.wheel||2105)/1000,map,mk,line,trk,follow=true,voice=true,said={},offT=0,pages,pg=0,ep=0;
 $('#wh').value=wheel*1000;$('#wh').onchange=e=>{wheel=e.target.value/1000;localStorage.wheel=e.target.value};
 const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',4000)};
@@ -49,27 +49,34 @@ document.querySelectorAll('[data-bt]').forEach(b=>b.onclick=()=>link(b.dataset.b
 const onFix=(c,ts)=>{if(c.accuracy>30)return;const now=ts||Date.now();let pr=S.last,brk=false;
  if(pr){const dt=Math.max((now-(S.lft||pr.t))/1000,.5),d0=hav(pr.lat,pr.lon,c.latitude,c.longitude); // salto imposible = lectura GPS falsa
   if(d0/dt>(S.sport=='run'?9:28)){if(++S.rej<5)return;S.rej=0;pr=null;brk=true}else S.rej=0}
- if(S.lft&&now-S.lft>30000)brk=true;S.lft=now;if(brk){S.seg++;S.buf=[]}
+ if(S.lft&&now-S.lft>30000)brk=true;S.lft=now;S.gw=0;if(brk){S.seg++;S.buf=[]}
  S.lat=c.latitude;S.lon=c.longitude;
  if(c.altitude!=null)S.alt=S.alt==null?c.altitude:S.alt+.25*(c.altitude-S.alt);
  const gs=c.speed!=null?c.speed*3.6:null,dd=pr?hav(pr.lat,pr.lon,c.latitude,c.longitude):0;
  if(!pr||dd>=2){
-  if(pr){S.odo+=dd;if(S.rec&&!S.pause){S.dist+=dd;if(S.alt!=null&&pr.alt!=null&&S.alt>pr.alt)S.gain+=S.alt-pr.alt}}
+  if(pr){S.odo+=dd;if(S.rec&&!S.pause)S.dist+=dd}
   S.last={lat:c.latitude,lon:c.longitude,alt:S.alt,t:now};
   S.buf.push({d:S.odo,a:S.alt});while(S.buf.length>2&&S.buf[1].d<=S.odo-50)S.buf.shift();
   const f=S.buf[0],l=S.buf.at(-1),sp=l.d-f.d;
   if(sp>=30&&f.a!=null&&l.a!=null)S.grade+=.3*(Math.max(-25,Math.min(25,(l.a-f.a)/sp*100))-S.grade)}
- S.spd=S.sspd!=null?S.sspd:(gs||0);
- const nw=Date.now(),dtf=S.lf?Math.min((nw-S.lf)/1000,10):0;S.lf=nw;if(S.rec&&!S.pause&&S.spd>1.5)S.mov+=dtf;
- if(S.rec&&!S.pause){if(S.spd<90)S.max=Math.max(S.max,S.spd);S.pts.push([Date.now(),+c.latitude.toFixed(6),+c.longitude.toFixed(6),S.alt==null?null:+S.alt.toFixed(1),S.hr||null,Math.round(S.cad)||null,S.pow||null,+S.spd.toFixed(1),S.seg])}
+ if(S.rec&&!S.pause&&S.alt!=null){if(S.gref==null)S.gref=S.alt;if(S.alt>S.gref+3){S.gain+=S.alt-S.gref;S.gref=S.alt}else if(S.alt<S.gref-3)S.gref=S.alt}
+ /* velocidad = distancia recorrida en una ventana de 8 s (coords.speed del navegador suele venir en 0 o nulo) */
+ S.od.push([now,S.odo]);while(S.od.length>2&&now-S.od[0][0]>8000)S.od.shift();
+ const w0=S.od[0],dtw=(now-w0[0])/1000;if(dtw>=1.5)S.vd=(S.odo-w0[1])/dtw*3.6;
+ S.spd=S.sspd!=null?S.sspd:Math.min(100,Math.max(S.vd,gs||0));
+ /* tiempo en movimiento por intervalos entre lecturas (sirve aunque las lecturas lleguen espaciadas) */
+ const dtf=S.lf2?Math.min((now-S.lf2)/1000,120):0,iv=dtf?(S.odo-S.o2)/dtf*3.6:0;S.lf2=now;S.o2=S.odo;
+ if(S.rec&&!S.pause&&(S.sspd!=null?S.sspd>1.5:iv>1.5))S.mov+=dtf;
+ if(S.rec&&!S.pause){if(S.spd<90)S.max=Math.max(S.max,S.spd);S.pts.push([now,+c.latitude.toFixed(6),+c.longitude.toFixed(6),S.alt==null?null:+S.alt.toFixed(1),S.hr||null,Math.round(S.cad)||null,S.pow||null,+S.spd.toFixed(1),S.seg])}
  liveClimb();mapUpd(c,brk);climbpro();ui()};
 if(NAT)NAT.BackgroundGeolocation.addWatcher({backgroundTitle:'Rodada',backgroundMessage:'Registrando tu rodada',requestPermissions:true,stale:false,distanceFilter:0},(l,e)=>{if(e)return toast('GPS: '+(e.message||e.code));l&&onFix(l,l.time)});
 else navigator.geolocation.watchPosition(p=>onFix(p.coords,p.timestamp),e=>toast('GPS: '+e.message),{enableHighAccuracy:true,maximumAge:0});
-setInterval(()=>{const n=Date.now();if(n-S.cat>3000)S.cad=0;if(n-S.sat>3000)S.sspd=null;ui()},1000);setInterval(()=>S.rec&&saveDraft(),20000);
+setInterval(()=>{const n=Date.now();if(n-S.cat>3000)S.cad=0;if(n-S.sat>3000)S.sspd=null;
+ if(S.rec&&!S.pause&&S.lft&&n-S.lft>20000&&!S.gw){S.gw=1;toast('Sin lecturas de GPS hace 20 s. En el navegador se pausan si cambias de app o apagas la pantalla; usa el APK para grabar en segundo plano.')}ui()},1000);setInterval(()=>S.rec&&saveDraft(),20000);
 
 let wl;const wake=async()=>{try{wl=await navigator.wakeLock.request('screen')}catch{}};
 $('#go').onclick=()=>{const n=Date.now();
- if(!S.rec){if(typeof alertReset=='function')alertReset();Object.assign(S,{rec:1,pause:0,t0:n,pms:0,pst:0,pts:[],dist:0,gain:0,mov:0,max:0,lf:0,seg:0,rej:0,lft:0});S.ac.list=[];wake()}
+ if(!S.rec){if(typeof alertReset=='function')alertReset();Object.assign(S,{rec:1,pause:0,t0:n,pms:0,pst:0,pts:[],dist:0,gain:0,mov:0,max:0,lf:0,seg:0,rej:0,lft:0,lf2:0,gw:0,gref:null,od:[],vd:0});S.ac.list=[];wake()}
  else if(!S.pause){S.pause=1;S.pst=n}else{S.pms+=n-S.pst;S.pause=0}
  ui();saveDraft()};
 $('#end').onclick=async()=>{if(!S.rec||!confirm('¿Terminar y guardar la actividad?'))return;
